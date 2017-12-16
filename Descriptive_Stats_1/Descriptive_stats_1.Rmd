@@ -1,0 +1,114 @@
+---
+title: "Introducing Descriptive Stats"
+tutorial:
+  version: 0.1
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+# For the tutorial format
+library(learnr)
+library(submittr)
+library(checkr2)
+tutorial_options(exercise.checker = checkr2::check_for_learnr)
+knitr::opts_chunk$set(echo = FALSE) 
+# For the contents of the tutorial
+library(mosaic)
+library(mosaicModel) # for the ci_mean, coverage, ci_median, ci_sd functions
+library(ggformula)
+library(NHANES)
+library(DT)
+Sleep_data <- 
+  NHANES %>% 
+  select(SleepHrsNight, SleepTrouble, PhysActive, TVHrsDay, 
+         Age, Gender, Poverty, SmokeNow, Education, HHIncome)
+```
+
+<!-- the login-mockup.Rmd file does the work of connecting to the 
+     password and event database. In login-mockup.Rmd, you could have
+     other logging destinations ...
+     -  options(tutorial.event_recorder = submit_via_cat)
+     -  options(tutorial.event_recorder = create_submit_to_file("~/Downloads/eventlog.txt")) 
+-->
+
+```{r child = system.file("shiny/login/login-mockup.Rmd", package = "submittr")}
+```
+
+## Introduction
+
+Statistics is about extracting *information* from *data*. Data consists of measurements or observations. Information is what guides us in making decisions or drawing conclusions. 
+
+The flow from data to decisions looks like this:
+
+![](data-to-decision.png)
+
+In the diagram, "Data" and "Statistics" are in crisp boxes: they are not usually a matter of debate. "Information," though, is in a fuzzy box. The information you extract by statistics from data is a matter of *your* choices: what you think is relevant to the decisions to be made. Other people might disagree. And decisions are always made in the context of other information or beliefs: things you know or believe about how the world works.
+
+## An example: Sleep
+
+As an example, let's look at some data collected by the US National Health and Nutrition Evaluation Survey (NHANES). In particularly, let's look at the NHANES data on how much sleep people get. Out of the dozens of medical, lifestyle, and socio-economic variables in NHANES, I've picked a few that *I* think are relevant and stored them under the name `Sleep_data`. You, of course, might think that my choices are silly; they are certainly incomplete.
+
+#### The `Sleep_data` data frame
+
+```{r}
+DT::datatable(Sleep_data)
+```
+Table taken out for now for development. (In the RStudio viewer, the widget doesn't play well.)
+
+The NHANES data for 10,000 individual people are contained in `Sleep_data`. The display above is interactive, so you can scroll through all 10,000. You can also sort by any of the variables and change the number of rows displayed. The documentation (or "codebook") for the NHANES data is [here](https://cran.r-project.org/web/packages/NHANES/NHANES.pdf), you can use that to figure out what each variable stands for.
+
+I've arranged the table so that the first two variables, `SleepHrsNight` and `SleepTrouble`, are about sleep. One of them is *quantitative*: how many hours of sleep per night (on average). The other is *categorical* and tells us whether the person gets *enough* sleep (according to the person's own judgment).
+
+The other variables are not directly about sleep. They are called *explanatory variables* because they will be used to *explain* the differences in sleep from one person to another. Later on, you'll have a chance to look at whatever variables in NHANES you think might be relevant. But for now, let's stick with these few that I have chosen.
+
+ACTIVITY: Spend a couple of minutes looking through the data shown above. Figure out whatever you can about sleep and how it might be related to the other variables. As you'll see, this is very hard; just try to figure out anything you can.
+
+## Data are hard to remember
+
+Most people who try to extract information from the data in the previous section find that it is hard. Our short-term memory isn't capable of keeping track when we go from one part of the data to another.
+
+To deal with this problem, over the centuries people have developed strategies for simplifying the data so that we can fit it into our heads all at one time. One reason people take a statistics course is to learn about these strategies and how to put them to work. There are two major groups of strategies:
+
+1. Use arithmetic to calculate one or a handful of numbers from the data. Arithmetic works because we don't have to have a very big memory in order to carry it out. For instance, if you want to calculate the sum of all the sleep hours in the data, you don't have to remember 10,000 numbers. You just have to keep track of a single number, the sum so far, and add each additional number on to that. Computers make it even easier.
+
+The numbers we calculate from the data are called *descriptive statistics*. They could just as well have been given another name, for instance "numerical summaries." People are much better at making sense of a few numerical summaries than they are of scrolling through thousands of lines of data.
+
+2. Use graphical displays to present the data. For some reason, people are really good at finding patterns by eye. To prove this, next time you are in a place where you can see the stars at night, look up. Try to find some patterns. We even have names for these patterns: the Milky Way, the Big Dipper, Orion, and so on. There are about 2000 stars visible (on a clear, dark night). Unlike numbers, you don't have to look at them individually. You see them as collections that form patterns. 
+
+This lesson is about descriptive statistics, so we won't be using graphics here. 
+
+## Calculating descriptive statistics
+
+Recall that the reason to calculate 
+One of the most basic descriptive statistics is the *mean*. The mean of the `SleepHrsNight` indicates how much sleep a *typical* person in the NHANES data gets. Here's the calculation:
+```{r sleep1, exercise = TRUE, warning = FALSE}
+df_stats( ~ SleepHrsNight, data = Sleep_data, mean)
+```
+
+```{r sleep1-check}
+fail_if_no_match(USER_CODE, df_stats( ~ SleepHrsNight, data = Sleep_data, mean),
+                 message = "You didn't need to change anything about the command, just press the 'Submit' button. Go back and press the little 'start over' button to reset the command to it's original form.")
+pass_anyways()
+```
+
+
+So, about 7 hours per night. The mean is a descriptive statistic, but it is hardly the only one. We'll talk about others in a later section. For now, let's look at the computer command to do the calculation.
+
+It's helpful to have some vocabulary so that we can talk about the computations we tell the computer to carry out. So, a really simple example of a computation: `3 + 5`. 
+- The `+` specifies the operation or *function*, what kind of computation will be done, here it's addition.
+- 3 and 5 are the *inputs* to the function. Another word for inputs is *arguments*.
+ 
+`df_stats()` is typical of how we tell the computer *what* it should do:
+
+1. We pick a *function* that accomplishes the desired task. The command will have a basic structure that is the *name* of the function followed by a matched pair of open and closing parentheses: `df_stats(   )`. 
+    
+    Think of a function like a verb in English. If you were learning English, you would start by learning a few verbs, say, "to eat" or "to sleep" or "to walk." Similarly, you'll have to learn a handful of statistics verbs. This one, called `df_stats` means "calculate descriptive statistics."
+
+2. We specify the *inputs* to the function. These go inside the matched pair of parentheses and are always separated by commas. Look carefully at the command for calculating the mean and you'll see that there are two commas. That means there are three arguments.
+
+- `~ SleepHrsNight` is the first argument. This particular one, is a *formula*. It's easy to spot a formula, since it always has a `~` character. Formulas are used to refer to *variables* and the relationship between them.
+- `data = Sleep_data`   is the data argument. Mostly we'll be doing computation on data, so you'll see a `data = ` argument in many commands.
+- `mean` is the third argument. Not all functions will need a third argument. On the other hand sometimes you will have more than three. These arguments specify details of what is to be computed. For `df_stats()`, the third argument is specifying that the particular descriptive statistic should be the mean.
+
+REMEMBER TO TELL git TO IGNORE dbkeys.yml
