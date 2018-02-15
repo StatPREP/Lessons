@@ -1,0 +1,102 @@
+---
+title: "An Experiment with Paper Planes"
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(tidyverse)
+library(ggformula)
+library(mosaicModel)
+library(googlesheets)
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## Aviation Improvement
+
+In this lesson, you're going to carry out an experiment about features of airplane design that lead to better performance. Lacking access to an real airplane whose design we can modify (and lacking also a test pilot, money for fuel, an airport, and permission from the Federal Aviation Administration), we're going to make do with a paper airplane.
+
+![](images/hand-and-plane.png)
+
+You'll need a piece of paper and a paperclip. Your team should decide on what shape airplane to make and where you are going to put the paper-clip on the airplane body.
+
+Fold the paper into your airplane and, before you fly it, make your best guess about whether the plane will fly further with or without the paperclip. Your guess whould include something about the center and the variability.
+
+Here's the experimental protocol. Read this to 
+
+1. Choose one member of your group to be the thrower and another group member to be the measurer.
+2. The thrower will stand with both sets of toes on a well-defined line. He or she will throw the plane, taking care to use about the same force and style each time the plane is thrown.
+3. The measurer will mark the distance from the throwing line to the point the plane first touches down. You can do this with a measuring tape or just by stepping off the distance heel to toe.
+4. Record your measurement and the airplane configuration on a sheet of paper, so that you'll be ready to enter your data in the next section of this exercise.
+4. Throw the airplane 20 times, alternating between the with- and without-paperclip configuration.
+
+## The Data
+
+Once you've completed your 20 experimental trials, enter your data in [this  spreadsheet](https://docs.google.com/spreadsheets/d/1GJAc0PkvRagKEuyiL60YZ5G3YlnhpiW4amwa0mMOSp0/edit#gid=0) shared by the entire class:
+
+* Make a new line for each trial, that is, each measured throw of the paper airplane.
+* Enter your team name and school for each row. Make sure to keep the spelling consistent. The order of the rows in the table doesn't matter.
+* You don't need to save the spreadsheet, that happens automatically.
+
+## Look at the data
+
+The data you entered, along with those of your classmates, have been stored in a Google Sheet. The name of the data table is `Airplane_data`. 
+As people enter more data, the Google Sheet will change. Each time you run a chunk, `Plane_data` automatically updates to show the most recent state of the data.
+
+```{r read_data, echo = FALSE}
+con2 <- gs_key("1GJAc0PkvRagKEuyiL60YZ5G3YlnhpiW4amwa0mMOSp0")
+Plane_data <- gs_read(con2)
+```
+
+```{r show_data, exercise = TRUE, message=FALSE, exercise.setup = "read_data"}
+Plane_data 
+```
+
+### Basic questions
+
+1. What is the unit of observation in the data table?
+2. What is the experimental unit? (An airplane, one from each group.)
+3. What variable is being systematically varied over the experimental trials?
+4. Obviously your team's twenty trials are a sample. How would you describe the "population"?
+
+### Graphing the data
+
+Let's start by looking just at your team's data instead of the whole data set across all teams. The following command will show just your team's data. Make sure to replace the `testing` and `UMN` with your own team and school name, leaving the quotation marks.
+
+```{r team_data, exercise = TRUE, message = FALSE, warning = FALSE, exercise.setup = "read_data"}
+Our_team_data <- 
+  Plane_data %>%
+  filter(team_name == "testing", school_name == "UMN")
+Our_team_data
+Our_team_data %>%
+  gf_jitter(distance ~ paperclip, color = ~ paperclip, width = 0.2)
+```
+
+### The effect size
+
+A quick statistical test of whether the paperclip helped, hurt, or had no effect is to calculate the mean distance (and its confidence interval) for the flights with and without the paperclips. Again, remember to put your actual team name and school name inside the quotation marks. 
+
+```{r team_data2, exercise = TRUE, message = FALSE, warning = FALSE, exercise.setup = "read_data"}
+Our_team_data <- 
+  Plane_data %>%
+  filter(team_name == "testing", school_name == "UMN")
+Our_team_data %>%
+  df_stats(distance ~ paperclip, mean, ci.mean )
+```
+
+## All the teams
+
+Create an informative graphic to show the effect of the paperclip across all groups. You'll have to replace the blanks in the following command with appropriate variable names. Note that the graphic command is `gf_jitter()`. You might want to try `gf_boxplot()` instead.
+
+```{r all_teams, exercise = TRUE, message = FALSE, warning = FALSE, exercise.setup = "read_data"}
+Plane_data %>%
+  gf_jitter(____ ~ _____, color = ~ ____)
+```
+
+
+### Your conclusions
+
+Summarise your conclusions in a way that will give helpful advice to future airplane designers and builders. Make sure to give some description about the "population" to which you think your result can appropriately be generalized.
+
+Oh, by the way. Were you right with the guess you made before you tried flying the plane?
