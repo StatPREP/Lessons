@@ -1,0 +1,138 @@
+---
+title: "What's Normal?"
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+
+```{r setup1, include=FALSE}
+library(learnr)
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+```{r setup, include=FALSE}
+library(learnr)     # the tutorial package
+library(statPREP)   # some things Danny put together for StatPREP
+library(tibble)     # for dealing with tibble data
+library(ggformula)  # all those gf_functions live hear
+library(mosaicData) # mosaic data sets
+library(mosaic)     # Project MOSAIC tools 
+library(natality2014)
+library(tidyverse)
+theme_set(theme_bw())   # get rid of the gray background in the plots
+# A few options for how R stuff is displayed
+knitr::opts_chunk$set(
+  echo = TRUE,                      # show R code in non-exercise chunks
+  fig.align = "center",             # center plots on the page
+  fig.width = 6, fig.height = 2.5   # default figure size
+  )
+Natality_2014_100k <- Natality_2014_100k %>%
+  mutate(bwt = dbwt/454) %>%
+  filter(is.na(urf_diab)==FALSE) %>%
+  filter(is.na(apgar5)==FALSE)
+```
+
+## What is Normal?
+
+![](images/crystal-ball-620x350.jpg)
+
+What's normal, versus what we expect to see
+
+Normal distribution-- most of the stuff is close to the mean, not too much is far from the mean.
+
+People often think that if you're close to the mean, you're "normal"
+
+Isn't it better to be in the tails? Is it better to not be normal?
+
+Depends on what the distribution is! If you're looking at IQ, you want to be on the upper tail. If it's debt, you'd prefer to be on the lower tail. 
+
+
+
+## Natality data
+
+We're using data from the CDC on births in 2014. The data is called `Natality_2014_100k`, and contains a sample of 100,000 babies from the full set of almost 4 million babies. 
+
+```{r}
+Natality_2014_100k
+```
+
+Notice that you can click through to see the data. There are many variables in the data, 
+
+```{r}
+names(Natality_2014_100k)
+```
+
+and if you want to know more about what the variables mean, try
+
+```{r, view-var-names, exercise=TRUE}
+help(Natality_2014_100k)
+```
+
+
+## Histogram
+
+```{r, first-histogram, exercise=TRUE, warning=FALSE, message=FALSE}
+gf_histogram(~bwt, data=Natality_2014_100k) 
+```
+
+Look at this plot. What do you see? What is that highest bar telling us about the data? Why do you think it is trailing off to the left? 
+
+What is a normal baby weight? Is this normal? 
+
+
+```{r quiz, echo=FALSE}
+quiz(
+  question("What does the horizontal axis of this graph represent?",
+    answer("Number of babies"),
+    answer("Weight of babies", correct=TRUE),
+    answer("Length of babies"),
+    answer("Age of mothers")
+  ),
+  question("What does the vertical axis represent?",
+    answer("Number of babies of each weight", correct = TRUE),
+    answer("Weight of babies"),
+    answer("Length of babies"),
+    answer("Total number of babies")
+  )
+)
+```
+
+## Explaining birthweight
+
+Discuss what factors might influence birthweight. Remember, you can look at the list of variables.
+
+```{r, data-names, exercise=TRUE}
+names(Natality_2014_100k)
+help(Natality_2014_100k)
+```
+
+
+## Diabetes
+
+One variable that might explain birthweight is `urf_diab`, whether or not the mother had diabetes before pregnancy. We can look at the histograms for the two groups to compare.
+```{r, two-hists, exercise=TRUE, warning=FALSE, message=FALSE}
+gf_histogram(~bwt|urf_diab, data=Natality_2014_100k)
+```
+
+What do you notice?
+
+One striking detail is that the distributions are very different heights. Other than that, the shapes are very similar. This probably means that diabetes has less of an effect on birthweight than we were expecting. 
+
+If we wanted to be able to compare the distributions more easily, we might scale them so they are both about the same height.
+
+```{r, two-density-hists, exercise=TRUE, warning=FALSE, message=FALSE}
+gf_histogram(..density..~bwt|urf_diab, data=Natality_2014_100k)
+```
+
+Now we can more easily compare the shapes of the distributions. 
+
+## Lots of histograms
+
+
+
+```{r, faceted-plot, warning=FALSE, message=FALSE,fig.height=5, fig.show='hold', exercise=TRUE}
+Natality_2014_100k %>% 
+  gf_histogram(..density..~bwt|apgar5) 
+```
+
+<!-- # want to have a normal distribution over each facetted plot -->

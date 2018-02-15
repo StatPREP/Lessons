@@ -1,0 +1,8 @@
+library(learnr)
+library(tibble)
+library(mosaic)
+library(mosaicData)
+library(tidyverse)
+library(mosaic)
+library(ggformula)
+library(natality2014)

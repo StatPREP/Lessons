@@ -1,0 +1,296 @@
+---
+title: "What's Normal?"
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+
+```{r setup1, include=FALSE}
+library(learnr)
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+
+```{r setup, include=FALSE}
+library(learnr)     # the tutorial package
+library(shiny)
+library(tibble)     # for dealing with tibble data
+library(ggformula)  # all those gf_functions live hear
+library(mosaicData) # mosaic data sets
+library(mosaic)     # Project MOSAIC tools 
+library(natality2014)
+library(tidyverse)
+theme_set(theme_bw())   # get rid of the gray background in the plots
+# A few options for how R stuff is displayed
+knitr::opts_chunk$set(
+  echo = TRUE,                      # show R code in non-exercise chunks
+  fig.align = "center",             # center plots on the page
+  fig.width = 6, fig.height = 2.5   # default figure size
+  )
+Natality_2014_100k <- Natality_2014_100k %>%
+  mutate(bwt = dbwt/454) %>%
+  filter(is.na(urf_diab)==FALSE) %>%
+  filter(is.na(apgar5)==FALSE)
+```
+
+## What is Normal?
+
+What does it mean to be normal? The word "normal" has different meanings in different contexts.
+
+- "Your blood pressure is normal," means that *your* blood pressure is within healthy bounds.
+- "This is normal weather," means that *today's weather* is usual for the season. (In the Arctic, the normal winter weather is definitely not healthy!)
+- "It's normal to feel sad when you lose your favorite toy," is a description of a typical human reaction. 
+- "It's normal to say 'hello' when meet someone," means that this is expected or correct behavior.
+
+In statistics, "normal" is a technical term. That's what this lesson is about. It's important to understand the technical meaning because sometimes people use the statistical meaning of "normal" to set the standard for the everyday meaning of normal. This is sometimes appropriate and sometimes not, so we're hoping to sharpen your understanding of the difference between everyday "normal" and statistical "normal".
+
+## A context: Pregnancy and Birth
+
+In statistics, a "distribution" is a way of describing variation from one case to another. To illustrate, this lesson will use data on births in the US in 2014. The US Centers for Disease Control collects state records on births so that they are available in one place. There are 3,998,175 records in the CDC data for 2014: about 4 million births! To keep the calculations fast, we'll work with a random sample of just 100,000 of these births.
+
+Mother's age at birth is one of the variables in the CDC data. In statistics, a "variable" is a pretty simple concept: a quantity or attribute that varies from case to case. Saying that mother's age is a variable is nothing more than saying that not all births happen at exactly the same age for the mother; the mother's age varies from birth to birth. Other such variables are the weight of the baby, the sex of the baby, and so on. In contrast, mother's sex is not a variable because it is the same for every birth. (Actually, it sounds kind of silly to speak of the "mother's sex.")
+
+### Mother's age at birth
+
+As you know, women have babies at different ages. You know a lot about this just from everyday experience. To illustrate, see if you have any difficulty coming up with reasonable answers to these questions:
+
+- What's the oldest age at which age would you call a baby's mother *young*?
+- What's the youngest age at which you would call a baby's mother *old*?
+
+There are different possible meanings for *young* and *old*. For instance, *young* might be taken to mean "too young to care responsibly for the baby." In statistics, the standard is different: a young mother would be taken to be one who is young compared to the large majority of mothers. And, in everyday speech, a *normal* age is one between *young* and *old*. 
+
+It might be tempting to say that a mother outside the young-to-old range is *abnormally* young or old, but let's be careful. *Abnormal* is taken by many people to mean *problematic* or *unhealthy* or even *pathological*. That's a judgement call. A women older than the large majority of mothers can have a perfectly healthy pregnancy and baby. 
+
+Keeping this statistical standard in mind, answer these questions based on your experience.
+
+- What's the age such that a mother younger than this would be *unusually young*? That is, there are some mothers who are just a bit young, and perhaps others who are *unusually young* even for a young mother.
+- What's the age such that a mother older than this would be *unusually old*?
+
+We might use *unusually young* or *unusually old* to mark the boundaries between a non-problematic age for a pregnancy and an age that's medically, psychologically, or socially problematic.
+
+## The age distribution graphically
+
+The following diagram shows the *distribution* of mother's age at birth for the 2014 US babies. 
+
+```{r echo = FALSE}
+plotOutput("ageDist")
+```
+
+The regions marked as "young" and "old" probably don't match your own idea of what these words mean when it comes to having a baby. Use the sliders to change the marked regions to what you think makes sense, for instance your answers to the questions in the previous section. 
+
+```{r echo = FALSE}
+sliderInput("young", "Young to have a baby", min = 0, max = 30, step = 1, value = c(25,30))
+sliderInput("old", "Old to have a baby", min = 30, max = 70, step = 1, value = c(35,40))
+```
+
+- There are two sliders along each scale: use this to define the lower and upper ages of "young to have a baby" and "old to have a baby" to whatever you think is appropriate.
+- You can read off the percentage of births in each of the five mother's age categories in the table below.
+
+```{r context = "server", echo = FALSE}
+dd <- density(Natality_2014_100k$mager, bw=1)
+dd <- with(dd,data.frame(x,y))
+normal_params <- reactive({
+  df_stats( ~ mager, data = Natality_2014_100k, mean, sd)
+})
+for_labs <- reactive({
+  tribble(
+  ~ lab, ~ y, ~ x, 
+  "young", 0, mean(input$young), 
+  "typical", 0, (input$young[2] + input$old[1])/2,
+  "old", 0, mean(input$old) 
+  )
+})
+
+for_frac <- reactive({
+  age_pct <- age_percent()
+  tribble(
+    ~ lab, ~ y, ~x, 
+    round(100 * age_percent()$vyoung, 1), 0.01, (input$young[1] +10)/2,
+    round(100 * age_percent()$young, 1), 0.01, mean(input$young),
+    round(100 * age_percent()$typical, 1), 0.01, (input$young[2] + input$old[1])/2,
+    round(100 * age_percent()$old, 1), 0.01, mean(input$old),
+    round(100 * age_percent()$vold, 1), 0.01, (input$old[2] + 55)/2
+  )%>%
+    mutate(lab = paste0(lab, "%"))
+  
+})
+data_plot <- reactive({
+ gf_ribbon(y + 0 ~ x, data = dd, fill = "gray", alpha = 0.5) %>%
+    gf_ribbon(y + 0 ~ x, data=subset(dd,x>input$young[1] & x<input$young[2]),
+                fill="brown",colour=NA,alpha=0.5) %>%
+    gf_ribbon(y + 0 ~ x, data=subset(dd,x>input$old[1] & x<input$old[2]),
+                fill="brown",colour=NA,alpha=0.25) %>%
+    gf_labs(x = "Mother's age at baby's birth") %>%
+    gf_label(y ~ x, label = ~ lab, angle = -90, data = for_labs(), color = c("brown", "black", "brown")) %>%
+    gf_label(y ~ x, label = ~ lab, data = for_frac(), color = c("blue","brown", "black", "brown", "blue" ))
+  })
+output$ageDist <- renderPlot({data_plot()})
+age_percent <- reactive({
+  vold <- mean(Natality_2014_100k$mager > as.numeric(input$old[2])-0.5)
+  old <- mean(Natality_2014_100k$mager > as.numeric(input$old[1])-0.5) - vold
+  typical <- mean(Natality_2014_100k$mager > as.numeric(input$young[2])+0.5) - (old + vold)
+  vyoung <- mean(Natality_2014_100k$mager < as.numeric(input$young[1]) + 0.5)
+  young <- 1 - (vold + old + typical + vyoung)
+  
+  list(vold = vold, old = old, typical = typical, young = young, vyoung = vyoung)
+})
+output$vyoung <- renderText({
+  round(100 * age_percent()$vyoung, 1)
+})
+output$old <- renderText({
+  round(100 * age_percent()$old, 1)
+})
+output$vold <- renderText({
+  round(100 * age_percent()$vold, 1)
+})
+output$young <- renderText({
+  round(100 * age_percent()$young, 1)
+})
+output$typical <- renderText({
+  round(100 * age_percent()$typical, 1)
+})
+```
+
+
+Category | Percent of births
+:---------|---------:
+Beyond young | `r textOutput("vyoung")` 
+On the young side | `r textOutput("young")`
+Neither old nor young | `r textOutput("typical")`
+On the old side | `r textOutput("old")` 
+Beyond old   | `r textOutput("vold")` 
+
+## A "normal" distribution?
+
+The distribution of mother's ages comes from the CDC data. Sometimes statisticians use a theoretical distribution as an approximation to an actual distribution. Although there can be good reasons to do this, to a large extent it is a matter of tradition, reflecting the historical period when computing was difficult and expensive.
+
+The most famous theoretical distribution is called the *normal* distribution. It earned this name because, surprisingly often, it makes a nice approximation to actual distributions of variables. Perhaps it would have been better to call it the *surprisingly often* distribution, but in the early days of statistics there was a lot of interest in the ideas of "normal" and "abnormal." (There are other statistical terms that reflect this history, for instance "standard deviation" or "standard error.")
+
+Don't fall into the trap of thinking that the *normal distribution* tells you about what's normal vs abnormal or healthy vs unhealthy. (Physicists and mathematicians refer to the distribution with the non-judgemental term "Gaussian distribution." Another name that's often used is "bell-shaped distribution.")
+head
+```{r echo = FALSE}
+checkboxGroupInput("whichDist", "Show:", choices = c("CDC data" = "cdc", "Normal dist" = "normal"),
+                   selected = c("cdc", "normal"), inline = TRUE)
+plotOutput("ageDist2")
+```
+
+```{r context = "server", echo = FALSE}
+output$ageDist3 <- output$ageDist2 <- renderPlot({
+    m <- normal_params()[[1]]
+    s <- normal_params()[[2]]
+    lines <- data.frame(x = m + c(-2,-1,1,2) * s)
+    lines$y <- dnorm(lines$x, mean = m, sd = s)
+    
+    for_frac2 <- reactive({
+  tribble( # these x values are for the labels, so in between the lines
+    ~ lab, ~ y, ~x, 
+    "2.3%", 0.02, m - 2.5*s,
+    "13.6%", 0.02, m - 1.5*s,
+    "68.3%", 0.02, m,
+    "13.6%", 0.02, m + 1.5*s,
+    "2.3%", 0.02, m + 2.5*s)
+  })
+
+  choices <- input$whichDist
+  if ("cdc" %in% choices) {
+    P <- data_plot() 
+  } else {
+    P <- gf_fun(dnorm(x, mean = normal_params()[[1]], sd = normal_params()[[2]]) ~ x, 
+             color = "white", alpha = 0, xlim = c(10,55)) 
+  }
+  if ("normal" %in% choices) {
+    P <- P %>%
+      gf_fun(dnorm(x, mean = normal_params()[[1]], sd = normal_params()[[2]]) ~ x, 
+             color = "red") %>%
+      gf_labs(y = "density") %>% 
+      gf_linerange(data = lines, 0 + y ~ x, color = "red") %>%
+      gf_label(y ~ x, label = ~ lab, data = for_frac2(), color = "red")
+  }
+  P
+})
+```
+
+
+
+
+```{r densityDiff, echo=FALSE}
+quiz(caption = "In the following questions, compare the shapes of the actual distribution of mother's age at birth and the normal-distribution model of it.",
+  question("In the interval from 25 to 31 years, how does the normal-distribution model match the actual distribution?", correct = "Right!", allow_retry = TRUE,
+    answer("It's an almost exact match."),
+    answer("The normal model overstates the fraction of mothers by about 10%.", correct=TRUE),
+    answer("The normal model understates the fraction of mothers by about 20%",
+           message = "Sorry. In the graph, the normal distribution is *above* the actual distribution."),
+    answer("The normal model overstates the fraction of mothers by about 30%",
+           message = "Sorry. In the graph, the normal distribution is *above* the actual distribution."),
+    answer("The normal model understates the fraction of mothers by about 40%",
+           message = "Sorry. The normal distribution is indeed *above* the actual distribution, but not by so large an amount.")
+    ),
+  question("In the interval from 33 to 55 years, how does the normal-distribution model match the actual distribution?", allow_retry = TRUE,
+    answer("It's an almost exact match.", correct=TRUE),
+    answer("The normal model overstates the fraction of mothers by about 10%.",
+           message = "Sorry. Is the normal distribution above, below, or just about at exactly the same height as the actual distribution?"),
+    answer("The normal model understates the fraction of mothers by about 20%",
+           message = "Sorry. Is the normal distribution above, below, or just about at exactly the same height as the actual distribution?"),
+    answer("The normal model overstates the fraction of mothers by about 30%",
+           message = "Sorry. Is the normal distribution above, below, or just about at exactly the same height as the actual distribution?"),
+    answer("The normal model understates the fraction of mothers by about 40%",
+           message = "Sorry. Is the normal distribution above, below, or just about at exactly the same height as the actual distribution?")
+  ),
+  question("At which age does the actual density of mothers exceed that of the normal-distribution model?",
+           answer("There's no such age."),
+           answer("Around age 15."),
+           answer("Around age 20.", correct = TRUE),
+           answer("Aound age 30."))
+)
+```
+
+## Normal versus normal
+
+In the previous section, we introduce the normal-distribution model and you compared it to the distribution actually shown by the data. 
+
+In the normal-distribution model, it's common to use $\pm 2$ standard deviations as defining "unusual" or "surprising." That is, when a value (e.g. the age of the mother) is outside the interval central interval in the normal-distribution model, it's regarded as atypical.
+
+In this section, we're going to look at the extent to which this statistical notion of atypical corresponds to your notion of what are unusually old or unusually young ages for a pregnant mother.
+Go back two sections and make sure you have set the sliders to match your personal opinion about the meaning of 'young', 'old', 'unusually young', and 'unusually old'. Then you'll be able to see your choices in the graph below.
+
+```{r echo = FALSE}
+plotOutput("ageDist3")
+```
+       
+The red vertical line marking the edge of the zone where 2.3% of the normal distribution lies is two standard deviations below the mean. The red lines delimiting the middle 68.3% of the distribution are one standard deviation above and below the mean. How does the two-standard-deviation line below correspond to the cut-off you chose for defining and unusually young mother?
+
+- They are practically at the same age.
+- My boundary is at a larger age than the minus-two-standard-deviation line.
+- My boundary is at a smaller age than the minus-two-standard-deviation line.
+
+How does the range of ages contained in your 'typical age' category correspond to the range between the plus-one and minus-one standard deviation lines?
+
+- About the same width.
+- My range for 'typical' is wider than the normal-distribution model.
+- My range for 'typical' is narrower than the normal-distribution model.
+
+
+<!-- # want to have a normal distribution over each facetted plot -->
+
+<!-- Taken out ...
+
+In some ways, its meaning overlaps with the everyday uses of "normal," but it also differs in important ways that lead to mis-understanding. First, statistical "normal" is never about a single observation. Statistical normal is about the *distribution* of a variable: a large collection of events taken together or a process for generating a number. To say, "your blood pressure is (statistically) normal," means that your blood pressure varies from one time to another and that it's often slightly above or below a value that's typical for you, but sometimes further above or below that typical value. Keep in mind that "typical for you" does not necessarily mean healthy.
+
+Statistical normal should not be a statement about "proper" or "in bounds." It would have been less confusing if statisticians used a term with less baggage. In fact, such terms are readily available, for instance "bell-shaped" or "gaussian." Still, the apparatus of the normal distribution -- "means" and "standard deviations" -- are sometimes useful for defining "normal" in the sense of "proper" or "in bounds." And, as you'll see, sometimes it's utterly inappropriate to use the apparatus for that purpose.
+
+Analogy: where people live around a city. The highest density is in the urban core, lower density in the suburbs, even lower in the "exurbs" or the rural regions surrounding the city. It's not that there is a "best" or "proper" place to live: "normal" is just a description of how people are distributed around the city.
+
+What's normal, versus what we expect to see
+
+"Usual" versus "surprising"
+
+"Tails" --- we could say that rural inhabitants live in the tails of the population distribution.
+
+Normal distribution-- most of the stuff is close to the mean, not too much is far from the mean.
+
+People often think that if you're close to the mean, you're "normal"
+
+Isn't it better to be in the tails? Is it better to not be normal?
+
+Depends on what the distribution is! If you're looking at IQ, you want to be on the upper tail. If it's debt, you'd prefer to be on the lower tail. 
+
+-->

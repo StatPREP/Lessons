@@ -1,0 +1,2 @@
+Starting with the everyday meaning of "normal," we'll use data to construct an operational definition of "normal." One example will make use of a census of all 4-million registered births over a year in the US, including birth-by-birth measures of pregnancy risk factors, maternal and newborn outcomes, and demographics. This will seque into more abstract measures of "normal," such as the shape and parameters of the famous normal distribution.
+
