@@ -1,6 +1,9 @@
 ---
 title: "What's Normal?"
 output: learnr::tutorial
+tutorial:
+  id: "StatPREP/whats-normal"
+  version: 0.1
 runtime: shiny_prerendered
 ---
 
@@ -32,6 +35,19 @@ Natality_2014_100k <- Natality_2014_100k %>%
   filter(is.na(apgar5)==FALSE)
 ```
 
+```{r include = FALSE}
+library(checkr)
+# uses the dbkeys.yml file to authenticate
+library(submittr)
+library(uuid)
+options(tutorial.event_recorder =
+          submittr::create_submit_to_db(table_name = "higgins",
+                              password_table_name = "passwords"))
+unique_session <- substr(UUIDgenerate(), 1, 8)
+submittr::set_user(paste0("anonymous_", unique_session), "student", "Danny")
+```
+
+
 ## What is Normal?
 
 What does it mean to be normal? The word "normal" has different meanings in different contexts.
@@ -39,7 +55,7 @@ What does it mean to be normal? The word "normal" has different meanings in diff
 - "Your blood pressure is normal," means that *your* blood pressure is within healthy bounds.
 - "This is normal weather," means that *today's weather* is usual for the season. (In the Arctic, the normal winter weather is definitely not healthy!)
 - "It's normal to feel sad when you lose your favorite toy," is a description of a typical human reaction. 
-- "It's normal to say 'hello' when meet someone," means that this is expected or correct behavior.
+- "It's normal to say 'hello' when you meet someone," means that this is expected or correct behavior.
 
 In statistics, "normal" is a technical term. That's what this lesson is about. It's important to understand the technical meaning because sometimes people use the statistical meaning of "normal" to set the standard for the everyday meaning of normal. This is sometimes appropriate and sometimes not, so we're hoping to sharpen your understanding of the difference between everyday "normal" and statistical "normal".
 
@@ -247,7 +263,7 @@ quiz(caption = "In the following questions, compare the shapes of the actual dis
 
 In the previous section, we introduce the normal-distribution model and you compared it to the distribution actually shown by the data. 
 
-In the normal-distribution model, it's common to use $\pm 2$ standard deviations as defining "unusual" or "surprising." That is, when a value (e.g. the age of the mother) is outside the interval central interval in the normal-distribution model, it's regarded as atypical.
+In the normal-distribution model, it's common to use $\pm 2$ standard deviations as defining "unusual" or "surprising." That is, when a value (e.g. the age of the mother) is outside the central interval in the normal-distribution model, it's regarded as atypical.
 
 In this section, we're going to look at the extent to which this statistical notion of atypical corresponds to your notion of what are unusually old or unusually young ages for a pregnant mother.
 Go back two sections and make sure you have set the sliders to match your personal opinion about the meaning of 'young', 'old', 'unusually young', and 'unusually old'. Then you'll be able to see your choices in the graph below.
