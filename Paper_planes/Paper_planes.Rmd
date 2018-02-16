@@ -36,7 +36,9 @@ Here's the experimental protocol. Read this to
 Once you've completed your 20 experimental trials, enter your data in [this  spreadsheet](https://docs.google.com/spreadsheets/d/1GJAc0PkvRagKEuyiL60YZ5G3YlnhpiW4amwa0mMOSp0/edit#gid=0) shared by the entire class:
 
 * Make a new line for each trial, that is, each measured throw of the paper airplane.
-* Enter your team name and school for each row. Make sure to keep the spelling consistent. The order of the rows in the table doesn't matter.
+* Enter your team name and school for each row. Make sure to keep the spelling consistent. In particular, you should arrange with the other groups that you all use exactly the same school name spelled exactly the same way. 
+* The `distance` variable has units, be they feet, meters, or whatever. All the groups should use the same unit, so that their results are comparable. (Remember, don't put the unit name in the data entry. If you are using feet, and your plane flew 10 feet, just enter `10`. The unit information goes in the codebook.)
+* The order of the rows in the table doesn't matter. You can insert a new row whereever is convenient. 
 * You don't need to save the spreadsheet, that happens automatically.
 
 ## Look at the data
@@ -56,7 +58,7 @@ Plane_data
 ### Basic questions
 
 1. What is the unit of observation in the data table?
-2. What is the experimental unit? (An airplane, one from each group.)
+2. What is the experimental unit? 
 3. What variable is being systematically varied over the experimental trials?
 4. Obviously your team's twenty trials are a sample. How would you describe the "population"?
 
@@ -75,24 +77,36 @@ Our_team_data %>%
 
 ### The effect size
 
-A quick statistical test of whether the paperclip helped, hurt, or had no effect is to calculate the mean distance (and its confidence interval) for the flights with and without the paperclips. Again, remember to put your actual team name and school name inside the quotation marks. 
+A quick statistical test of whether the paperclip helped, hurt, or had no effect is to calculate the mean distance for the flights with and without the paperclips. 
+
+Before you run the following command, replace the blanks with your own team name and school name.
+
+
 
 ```{r team_data2, exercise = TRUE, message = FALSE, warning = FALSE, exercise.setup = "read_data"}
 Our_team_data <- 
   Plane_data %>%
-  filter(team_name == "testing", school_name == "UMN")
+  filter(team_name == "______", school_name == "______")
 Our_team_data %>%
   df_stats(distance ~ paperclip, mean, ci.mean )
 ```
 
+The calculation produced the mean distance for flights with and for flights without a paperclip. Which one is bigger?
+
+The calculation also produced what's called the "confidence interval" on the mean for the paperclip and non-paperclip flights. If you haven't encountered confidence intervals yet in your course, don't be concerned! The confidence interval is a statistical description of the uncertainty in your results. If the confidence intervals for paperclip vs non-paperclip overlap, you've got good reason to think that your flight trials have identified that the paperclip has an effect. But if the confidence intervals overlap a lot, your experiment hasn't yet identified a difference. Collecting more data might help, but you can't know that until you've actually collected the additional data. 
+
 ## All the teams
 
-Create an informative graphic to show the effect of the paperclip across all groups. You'll have to replace the blanks in the following command with appropriate variable names. Note that the graphic command is `gf_jitter()`. You might want to try `gf_boxplot()` instead.
+Create an informative graphic to show the effect of the paperclip across all groups. You'll have to replace the blanks in the following command with appropriate variable names. 
 
 ```{r all_teams, exercise = TRUE, message = FALSE, warning = FALSE, exercise.setup = "read_data"}
 Plane_data %>%
-  gf_jitter(____ ~ _____, color = ~ ____)
+  gf_boxplot(____ ~ _____, color = ~ ____)
 ```
+
+In deciding which variables to put in which blanks, keep in mind that the response variable, `distance`, usually goes on the vertical axis, that is, the slot to the left of the tilde (`~`).
+
+Whether to use `team_name` or `paperclip` as the color is up to you. You can try it both ways and see which you prefer. 
 
 
 ### Your conclusions

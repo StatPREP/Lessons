@@ -67,7 +67,9 @@ if (window.hljs && document.readyState && document.readyState === "complete") {
 <p>Once you’ve completed your 20 experimental trials, enter your data in <a href="https://docs.google.com/spreadsheets/d/1GJAc0PkvRagKEuyiL60YZ5G3YlnhpiW4amwa0mMOSp0/edit#gid=0">this spreadsheet</a> shared by the entire class:</p>
 <ul>
 <li>Make a new line for each trial, that is, each measured throw of the paper airplane.</li>
-<li>Enter your team name and school for each row. Make sure to keep the spelling consistent. The order of the rows in the table doesn’t matter.</li>
+<li>Enter your team name and school for each row. Make sure to keep the spelling consistent. In particular, you should arrange with the other groups that you all use exactly the same school name spelled exactly the same way.</li>
+<li>The <code>distance</code> variable has units, be they feet, meters, or whatever. All the groups should use the same unit, so that their results are comparable. (Remember, don’t put the unit name in the data entry. If you are using feet, and your plane flew 10 feet, just enter <code>10</code>. The unit information goes in the codebook.)</li>
+<li>The order of the rows in the table doesn’t matter. You can insert a new row whereever is convenient.</li>
 <li>You don’t need to save the spreadsheet, that happens automatically.</li>
 </ul>
 </div>
@@ -86,7 +88,7 @@ Plane_data &lt;- gs_read(con2)</code></pre>
 <h3>Basic questions</h3>
 <ol style="list-style-type: decimal">
 <li>What is the unit of observation in the data table?</li>
-<li>What is the experimental unit? (An airplane, one from each group.)</li>
+<li>What is the experimental unit?</li>
 <li>What variable is being systematically varied over the experimental trials?</li>
 <li>Obviously your team’s twenty trials are a sample. How would you describe the “population”?</li>
 </ol>
@@ -106,25 +108,30 @@ Our_team_data %&gt;%
 </div>
 <div id="section-the-effect-size" class="section level3">
 <h3>The effect size</h3>
-<p>A quick statistical test of whether the paperclip helped, hurt, or had no effect is to calculate the mean distance (and its confidence interval) for the flights with and without the paperclips. Again, remember to put your actual team name and school name inside the quotation marks.</p>
+<p>A quick statistical test of whether the paperclip helped, hurt, or had no effect is to calculate the mean distance for the flights with and without the paperclips.</p>
+<p>Before you run the following command, replace the blanks with your own team name and school name.</p>
 <div class="tutorial-exercise" data-label="team_data2" data-caption="Code" data-completion="1" data-diagnostics="1" data-startover="1" data-lines="0">
 <pre class="text"><code>Our_team_data &lt;- 
   Plane_data %&gt;%
-  filter(team_name == &quot;testing&quot;, school_name == &quot;UMN&quot;)
+  filter(team_name == &quot;______&quot;, school_name == &quot;______&quot;)
 Our_team_data %&gt;%
   df_stats(distance ~ paperclip, mean, ci.mean )</code></pre>
 <script type="application/json" data-opts-chunk="1">{"fig.width":6.5,"fig.height":4,"fig.retina":2,"fig.align":"default","fig.keep":"high","fig.show":"asis","out.width":624,"warning":false,"error":false,"message":false,"exercise.df_print":"paged","exercise.setup":"read_data","exercise.checker":"NULL"}</script>
 </div>
+<p>The calculation produced the mean distance for flights with and for flights without a paperclip. Which one is bigger?</p>
+<p>The calculation also produced what’s called the “confidence interval” on the mean for the paperclip and non-paperclip flights. If you haven’t encountered confidence intervals yet in your course, don’t be concerned! The confidence interval is a statistical description of the uncertainty in your results. If the confidence intervals for paperclip vs non-paperclip overlap, you’ve got good reason to think that your flight trials have identified that the paperclip has an effect. But if the confidence intervals overlap a lot, your experiment hasn’t yet identified a difference. Collecting more data might help, but you can’t know that until you’ve actually collected the additional data.</p>
 </div>
 </div>
 <div id="section-all-the-teams" class="section level2">
 <h2>All the teams</h2>
-<p>Create an informative graphic to show the effect of the paperclip across all groups. You’ll have to replace the blanks in the following command with appropriate variable names. Note that the graphic command is <code>gf_jitter()</code>. You might want to try <code>gf_boxplot()</code> instead.</p>
+<p>Create an informative graphic to show the effect of the paperclip across all groups. You’ll have to replace the blanks in the following command with appropriate variable names.</p>
 <div class="tutorial-exercise" data-label="all_teams" data-caption="Code" data-completion="1" data-diagnostics="1" data-startover="1" data-lines="0">
 <pre class="text"><code>Plane_data %&gt;%
-  gf_jitter(____ ~ _____, color = ~ ____)</code></pre>
+  gf_boxplot(____ ~ _____, color = ~ ____)</code></pre>
 <script type="application/json" data-opts-chunk="1">{"fig.width":6.5,"fig.height":4,"fig.retina":2,"fig.align":"default","fig.keep":"high","fig.show":"asis","out.width":624,"warning":false,"error":false,"message":false,"exercise.df_print":"paged","exercise.setup":"read_data","exercise.checker":"NULL"}</script>
 </div>
+<p>In deciding which variables to put in which blanks, keep in mind that the response variable, <code>distance</code>, usually goes on the vertical axis, that is, the slot to the left of the tilde (<code>~</code>).</p>
+<p>Whether to use <code>team_name</code> or <code>paperclip</code> as the color is up to you. You can try it both ways and see which you prefer.</p>
 <div id="section-your-conclusions" class="section level3">
 <h3>Your conclusions</h3>
 <p>Summarise your conclusions in a way that will give helpful advice to future airplane designers and builders. Make sure to give some description about the “population” to which you think your result can appropriately be generalized.</p>
