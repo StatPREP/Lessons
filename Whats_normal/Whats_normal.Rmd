@@ -36,15 +36,15 @@ Natality_2014_100k <- Natality_2014_100k %>%
 ```
 
 ```{r include = FALSE}
-library(checkr)
+# library(checkr)
 # uses the dbkeys.yml file to authenticate
-library(submittr)
-library(uuid)
-options(tutorial.event_recorder =
-          submittr::create_submit_to_db(table_name = "higgins",
-                              password_table_name = "passwords"))
-unique_session <- substr(UUIDgenerate(), 1, 8)
-submittr::set_user(paste0("anonymous_", unique_session), "student", "Danny")
+# library(submittr)
+# library(uuid)
+# options(tutorial.event_recorder =
+#           submittr::create_submit_to_db(table_name = "higgins",
+#                               password_table_name = "passwords"))
+# unique_session <- substr(UUIDgenerate(), 1, 8)
+# submittr::set_user(paste0("anonymous_", unique_session), "student", "Danny")
 ```
 
 
@@ -184,13 +184,16 @@ The most famous theoretical distribution is called the *normal* distribution. It
 Don't fall into the trap of thinking that the *normal distribution* tells you about what's normal vs abnormal or healthy vs unhealthy. (Physicists and mathematicians refer to the distribution with the non-judgemental term "Gaussian distribution." Another name that's often used is "bell-shaped distribution.")
 head
 ```{r echo = FALSE}
-checkboxGroupInput("whichDist", "Show:", choices = c("CDC data" = "cdc", "Normal dist" = "normal"),
-                   selected = c("cdc", "normal"), inline = TRUE)
+checkboxGroupInput(
+  "whichDist", "Show:", 
+  choices = c("CDC data" = "cdc", "Normal dist" = "normal"),
+  selected = c("cdc", "normal"), inline = TRUE)
 plotOutput("ageDist2")
 ```
 
 ```{r context = "server", echo = FALSE}
-output$ageDist3 <- output$ageDist2 <- renderPlot({
+output$ageDist3 <- 
+  output$ageDist2 <- renderPlot({
     m <- normal_params()[[1]]
     s <- normal_params()[[2]]
     lines <- data.frame(x = m + c(-2,-1,1,2) * s)
@@ -208,10 +211,12 @@ output$ageDist3 <- output$ageDist2 <- renderPlot({
 
   choices <- input$whichDist
   if ("cdc" %in% choices) {
-    P <- data_plot() 
+    P <- data_plot() %>% 
+      gf_lims(y = c(0, 0.07), x = c(10, 55))
   } else {
     P <- gf_fun(dnorm(x, mean = normal_params()[[1]], sd = normal_params()[[2]]) ~ x, 
-             color = "white", alpha = 0, xlim = c(10,55)) 
+             color = "white", alpha = 0, xlim = c(10,55)) %>% 
+      gf_lims(y = c(0, 0.07))
   }
   if ("normal" %in% choices) {
     P <- P %>%
