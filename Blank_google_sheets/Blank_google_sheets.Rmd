@@ -1,0 +1,50 @@
+---
+title: "Accessing our class's data"
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(googlesheets)
+library(dplyr)
+library(ggformula)
+library(mosaicCore)
+library(mosaic)
+library(mosaicData)
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+Copy over the command I have provided on the course web site and paste it in as the very first line on *each* of the command chunks below. (The command has `gs_read()` in it.) That will read in our class's data. Then underneath that, you can construct additional commands as needed to accomplish the task.
+
+## Task 1
+ 
+```{r task1, exercise=TRUE, message = FALSE}
+# Paste the gs_read command here, as the first line of this command block.
+
+```
+
+## Task 2
+
+```{r task2, exercise=TRUE, message = FALSE}
+# Past the gs_read command here, as the first line of this command block.
+
+```
+
+
+## Task 3
+
+```{r task3, exercise=TRUE, message = FALSE}
+# Past the gs_read command here, as the first line of this command block.
+
+```
+
+
+## Task 4
+
+```{r task4, exercise=TRUE, message = FALSE}
+# Past the gs_read command here, as the first line of this command block.
+
+```
+
+

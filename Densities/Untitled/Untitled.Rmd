@@ -1,0 +1,21 @@
+---
+title: "Tutorial"
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## RMarkdown App
+
+```{r child = "../show_density.Rmd"}
+```
+
+The Rmd file containing the app has all server elements of the app in chunks identified with `context = "server"`.
+
+
+
+

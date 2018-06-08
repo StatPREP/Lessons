@@ -1,0 +1,10 @@
+require(dplyr)
+require(learnr)
+require(mosaic)
+require(mosaicData)
+require(ggformula)
+require(checkr)
+require(mosaicCore)
+require(knitr)
+require(ggplot2)
+

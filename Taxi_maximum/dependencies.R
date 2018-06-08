@@ -1,0 +1,5 @@
+library(learnr)
+library(tidyverse)
+library(mosaic)
+library(mosaicCore)
+library(ggformula)

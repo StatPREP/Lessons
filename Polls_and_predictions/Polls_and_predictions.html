@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+
+
+<meta name="progressive" content="false" />
+<meta name="allow-skip" content="false" />
+
+<title>Polls and prediction</title>
+
+
+<!-- highlightjs -->
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs && document.readyState && document.readyState === "complete") {
+   window.setTimeout(function() {
+      hljs.initHighlighting();
+   }, 0);
+}
+</script>
+
+
+
+</head>
+
+<body>
+
+
+
+<div class="pageContent band">
+<div class="bandContent page">
+
+<div class="topics">
+
+<div class="tutorial-exercise-support" data-label="prepare-votes" data-caption="Code" data-completion="1" data-diagnostics="1" data-startover="1" data-lines="0">
+<pre class="text"><code>data(&quot;Minneapolis2013&quot;, package = &quot;DataComputing&quot;)
+winners &lt;- c(&quot;BETSY HODGES&quot;, &quot;MARK ANDREW&quot;, &quot;DON SAMUELS&quot;)
+Votes_for_mayor &lt;-
+  Minneapolis2013 %&gt;%
+  mutate(vote = ifelse(First %in% winners, First, &quot;other&quot;)) %&gt;%
+  mutate(vote = ifelse(vote == &quot;other&quot;,
+                       ifelse(Second %in% winners, Second, &quot;other&quot;),
+                       vote)) %&gt;%
+  mutate(vote = ifelse(vote == &quot;other&quot;,
+                       ifelse(Third %in% winners, Third, &quot;other&quot;),
+                       vote)) %&gt;%
+  select(vote = vote, precinct = Precinct, ward = Ward)
+# -----------------
+V &lt;- 
+  Votes_for_mayor %&gt;%
+  mutate(vote = 
+           ifelse(vote == &quot;DON SAMUELS&quot;, &quot;MARK ANDREW&quot;, vote))
+# -----------------
+count_wins &lt;- function(x, who = &quot;BETSY.HODGES&quot;) {
+  who_column &lt;- which(names(x) == who)
+  if (length(who_column) != 1) stop(paste(&quot;No column match for&quot;, who))
+  other_columns &lt;- setdiff(1:ncol(x), who_column)
+  sofar = TRUE
+  for (col in other_columns) {
+    sofar &lt;- sofar &amp;  (x[[who_column]] &gt; x[[col]])
+  }
+  counts( ~ result, data = data.frame(result = sofar))
+}
+# -----------------------
+vote_sim &lt;- function(hodges_frac = 0.48, pop_size = 10000) {
+  vote = c(&quot;MARK ANDREW&quot;, &quot;BETSY HODGES&quot;)[
+          1 + (seq(0, 1, length = pop_size) &lt;= hodges_frac)]
+  data.frame(stringsAsFactors = FALSE,
+             vote = sample(vote))
+}</code></pre>
+</div>
+<div id="section-what-are-polls-for" class="section level2">
+<h2>What are polls for?</h2>
+<p>Voting day in the US is preceeded by months or years of political opinion surveys or “polls.” Many people interpret the results of the polls as a prediction of how the election will turn out. This view is very common, but of course it is the votes themselves that determine the election and there are many reasons why the opinion surveys may not match the election results.</p>
+<ul>
+<li>Voters may change their minds.</li>
+<li>The people surveyed may not reveal their true preferences.</li>
+<li>People who agree to answer the survey may be different in their political views than people who refuse to answer. Indeed, the people who the survey-takers can reach may have, on average, different political views than those who cannot be reached.</li>
+<li>Registered voters included in the survey do not necessarily vote in the election.</li>
+<li>The results from the opinion surveys may themselves change how people act.</li>
+</ul>
+<p>These are all valid reasons to question the predictive power of polls. But even with all these valid reasons, a common rejection of opinion polls is founded in fallacy:</p>
+<ul>
+<li>FALLACY. If the size of the voting population is much bigger than the size of the opinion poll, then the opinion poll can’t be used for prediction. After all, typical opinion polls have one- to two-thousand participants, which might be 1% or less of the number of voters (for a state election) or 0.001% for a presidential election.</li>
+</ul>
+</div>
+<div id="section-sampling-voters" class="section level2">
+<h2>Sampling voters</h2>
+<p>Since elections involve a secret ballot, it can be hard to get ballot-by-ballot data. One place where a complete list of ballots was published is the mayoral election in Minneapolis, Minnesota in 2013.</p>
+<p>Here’s the final vote tally out of <code>nrow(Votes_for_mayor)</code> altogether:</p>
+<pre class="r"><code>counts( ~ vote, data = Votes_for_mayor)</code></pre>
+<pre><code>## vote
+## BETSY HODGES  DON SAMUELS  MARK ANDREW        other 
+##        34083        11609        22713        11696</code></pre>
+<p>Betsy Hodges won. She got more votes than any other candidate.</p>
+<p>Suppose we had conducted an opinion poll before the election. The idea kind of prediction poll would be able to ask the eventual voters for their preferences. This is impossible to do in practice. After all, who turns out to vote depends on many things including random factors such as the weather, transportation, and so on. And it’s unlikely that everybody we survey will give an answer, let alone an honest answer. Still, let’s assume that we actually could collect an honest, random sample of the eventual voters.</p>
+<p>The <code>sample_n()</code> function takes a random sample from a data table. Since <code>Votes_for_mayor</code> contains all the votes, doing a pre-election survey is equivalent to taking a random sample from the votes. Let’s take a survey of 0.025% of the eventual voters: 20 participants altogether.</p>
+<pre class="r"><code>counts( ~ vote, data = sample_n(Votes_for_mayor, size = 20))</code></pre>
+<pre><code>## vote
+## BETSY HODGES  DON SAMUELS  MARK ANDREW        other 
+##           10            2            3            5</code></pre>
+<p>Betsy Hodges was the leading candidate in the poll. In other words, this particular poll correctly indicates the eventual winner.</p>
+</div>
+<div id="section-an-ensemble-of-polls" class="section level2">
+<h2>An Ensemble of Polls</h2>
+<p>In the previous section we simulated one opinion survey about the Minneapolis mayoral election. That one came out the same as the eventual vote, even though there were 1000 times as many voters as people in the random sample for the survey.</p>
+<p>Will Betsy Hodges be the winner in all such surveys? Let’s try a few more:</p>
+<pre class="r"><code>counts( ~ vote, data = sample_n(Votes_for_mayor, size = 20))</code></pre>
+<pre><code>## vote
+## BETSY HODGES  DON SAMUELS  MARK ANDREW        other 
+##            9            2            5            4</code></pre>
+<pre class="r"><code>counts( ~ vote, data = sample_n(Votes_for_mayor, size = 20))</code></pre>
+<pre><code>## vote
+## BETSY HODGES  DON SAMUELS  MARK ANDREW        other 
+##           10            2            6            2</code></pre>
+<pre class="r"><code>counts( ~ vote, data = sample_n(Votes_for_mayor, size = 20))</code></pre>
+<pre><code>## vote
+## BETSY HODGES  DON SAMUELS  MARK ANDREW        other 
+##           10            1            6            3</code></pre>
+<pre class="r"><code>counts( ~ vote, data = sample_n(Votes_for_mayor, size = 20))</code></pre>
+<pre><code>## vote
+## BETSY HODGES  DON SAMUELS  MARK ANDREW        other 
+##            4            6            7            3</code></pre>
+<pre class="r"><code>counts( ~ vote, data = sample_n(Votes_for_mayor, size = 20))</code></pre>
+<pre><code>## vote
+## BETSY HODGES  DON SAMUELS  MARK ANDREW        other 
+##            9            4            5            2</code></pre>
+<p>This tiny survey, <span class="math inline">\(n=20\)</span>, gets it right most of the time. Here’s a way to repeat the random selection 100 times, that is, to “conduct 100 trials” of the simulation.</p>
+<pre class="r"><code>Trials &lt;- Do(100) * 
+  counts( ~ vote, 
+          data = sample_n(Votes_for_mayor, size = 20))
+Trials</code></pre>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["BETSY.HODGES"],"name":[1],"type":["int"],"align":["right"]},{"label":["DON.SAMUELS"],"name":[2],"type":["int"],"align":["right"]},{"label":["MARK.ANDREW"],"name":[3],"type":["int"],"align":["right"]},{"label":["other"],"name":[4],"type":["int"],"align":["right"]}],"data":[{"1":"7","2":"3","3":"8","4":"2"},{"1":"14","2":"1","3":"4","4":"1"},{"1":"10","2":"4","3":"6","4":"10"},{"1":"11","2":"2","3":"7","4":"11"},{"1":"10","2":"2","3":"8","4":"10"},{"1":"12","2":"3","3":"4","4":"1"},{"1":"11","2":"1","3":"5","4":"3"},{"1":"11","2":"1","3":"7","4":"1"},{"1":"9","2":"5","3":"4","4":"2"},{"1":"9","2":"6","3":"3","4":"2"},{"1":"12","2":"3","3":"2","4":"3"},{"1":"8","2":"4","3":"5","4":"3"},{"1":"7","2":"3","3":"8","4":"2"},{"1":"11","2":"2","3":"4","4":"3"},{"1":"10","2":"1","3":"5","4":"4"},{"1":"8","2":"2","3":"8","4":"2"},{"1":"6","2":"4","3":"9","4":"1"},{"1":"7","2":"4","3":"5","4":"4"},{"1":"10","2":"4","3":"4","4":"2"},{"1":"10","2":"2","3":"6","4":"2"},{"1":"5","2":"4","3":"8","4":"3"},{"1":"6","2":"4","3":"8","4":"2"},{"1":"2","2":"5","3":"12","4":"1"},{"1":"9","2":"3","3":"5","4":"3"},{"1":"9","2":"2","3":"6","4":"3"},{"1":"4","2":"1","3":"9","4":"6"},{"1":"11","2":"2","3":"5","4":"2"},{"1":"12","2":"1","3":"7","4":"12"},{"1":"10","2":"5","3":"4","4":"1"},{"1":"8","2":"1","3":"6","4":"5"},{"1":"10","2":"6","3":"4","4":"10"},{"1":"5","2":"4","3":"6","4":"5"},{"1":"13","2":"2","3":"3","4":"2"},{"1":"8","2":"3","3":"6","4":"3"},{"1":"8","2":"3","3":"5","4":"4"},{"1":"7","2":"3","3":"6","4":"4"},{"1":"9","2":"3","3":"2","4":"6"},{"1":"9","2":"4","3":"6","4":"1"},{"1":"7","2":"2","3":"6","4":"5"},{"1":"7","2":"5","3":"5","4":"3"},{"1":"11","2":"4","3":"3","4":"2"},{"1":"8","2":"5","3":"5","4":"2"},{"1":"11","2":"1","3":"4","4":"4"},{"1":"8","2":"3","3":"6","4":"3"},{"1":"12","2":"2","3":"6","4":"12"},{"1":"10","2":"4","3":"5","4":"1"},{"1":"7","2":"9","3":"4","4":"7"},{"1":"5","2":"4","3":"6","4":"5"},{"1":"10","2":"2","3":"6","4":"2"},{"1":"7","2":"3","3":"10","4":"7"},{"1":"5","2":"7","3":"5","4":"3"},{"1":"6","2":"6","3":"2","4":"6"},{"1":"10","2":"8","3":"2","4":"10"},{"1":"6","2":"1","3":"9","4":"4"},{"1":"5","2":"3","3":"11","4":"1"},{"1":"9","2":"3","3":"5","4":"3"},{"1":"11","2":"1","3":"8","4":"11"},{"1":"4","2":"11","3":"5","4":"4"},{"1":"9","2":"7","3":"4","4":"9"},{"1":"13","2":"1","3":"5","4":"1"},{"1":"8","2":"3","3":"5","4":"4"},{"1":"10","2":"3","3":"6","4":"1"},{"1":"10","2":"3","3":"3","4":"4"},{"1":"11","2":"5","3":"3","4":"1"},{"1":"10","2":"1","3":"6","4":"3"},{"1":"9","2":"2","3":"6","4":"3"},{"1":"8","2":"4","3":"5","4":"3"},{"1":"11","2":"1","3":"5","4":"3"},{"1":"8","2":"2","3":"8","4":"2"},{"1":"8","2":"8","3":"4","4":"8"},{"1":"8","2":"4","3":"6","4":"2"},{"1":"7","2":"4","3":"5","4":"4"},{"1":"14","2":"5","3":"1","4":"14"},{"1":"7","2":"3","3":"5","4":"5"},{"1":"8","2":"2","3":"6","4":"4"},{"1":"8","2":"1","3":"7","4":"4"},{"1":"10","2":"2","3":"4","4":"4"},{"1":"6","2":"4","3":"5","4":"5"},{"1":"6","2":"11","3":"3","4":"6"},{"1":"12","2":"1","3":"4","4":"3"},{"1":"10","2":"4","3":"4","4":"2"},{"1":"9","2":"5","3":"3","4":"3"},{"1":"10","2":"2","3":"6","4":"2"},{"1":"9","2":"2","3":"6","4":"3"},{"1":"10","2":"6","3":"3","4":"1"},{"1":"5","2":"3","3":"9","4":"3"},{"1":"11","2":"2","3":"6","4":"1"},{"1":"6","2":"7","3":"4","4":"3"},{"1":"7","2":"2","3":"7","4":"4"},{"1":"11","2":"1","3":"6","4":"2"},{"1":"8","2":"1","3":"6","4":"5"},{"1":"8","2":"3","3":"4","4":"5"},{"1":"9","2":"2","3":"6","4":"3"},{"1":"10","2":"1","3":"6","4":"3"},{"1":"10","2":"2","3":"6","4":"2"},{"1":"9","2":"5","3":"3","4":"3"},{"1":"9","2":"6","3":"5","4":"9"},{"1":"4","2":"5","3":"4","4":"7"},{"1":"8","2":"3","3":"7","4":"2"},{"1":"9","2":"2","3":"3","4":"6"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p>You can page through the 100 simulations to see how often the survey pointed to the eventual winner. The <code>count_wins()</code> function was specially written to make the job easier:</p>
+<pre class="r"><code>count_wins(Trials, &quot;BETSY.HODGES&quot;)</code></pre>
+<pre><code>## result
+##  TRUE FALSE 
+##    65    35</code></pre>
+<p>This tiny survey is making the right call about two-thirds of the time.</p>
+<p>How big would the survey have to be to show Betsy Hodges in the lead 95% of the time. The following code block will repeat the simulation; you can set the size of the poll. Try a few survey sizes and find the smallest that gives Hodges as a winner about 95% of the time.</p>
+<div class="tutorial-exercise" data-label="orig_split" data-caption="Code" data-completion="1" data-diagnostics="1" data-startover="1" data-lines="0">
+<pre class="text"><code>Trials &lt;- Do(1000) * 
+  counts( ~ vote, 
+          data = sample_n(Votes_for_mayor, size = 20))
+count_wins(Trials)</code></pre>
+<script type="application/json" data-opts-chunk="1">{"fig.width":6.5,"fig.height":4,"fig.retina":2,"fig.align":"default","fig.keep":"high","fig.show":"asis","out.width":624,"warning":false,"error":false,"message":true,"exercise.df_print":"paged","exercise.setup":"prepare-votes","exercise.checker":"NULL"}</script>
+</div>
+
+<div id="htmlwidget-4a3093f9c48f9772599b" style="width:100%;height:auto;", class = "quiz html-widget">
+<div class="panel panel-default">
+<div class="panel-body quizArea">
+</div>
+</div>
+</div>
+
+<script type="application/json" data-for="htmlwidget-4a3093f9c48f9772599b">{"x":{"question":"What&#39;s the smallest survey size that leads to the correct prediction about 95% of the time?","answers":[{"option":"About \\(n = 30\\).","correct":false,"message":null},{"option":"About \\(n = 50\\).","correct":false,"message":null},{"option":"About \\(n = 100\\).","correct":true,"message":null},{"option":"About \\(n = 250\\).","correct":false,"message":"That does better than 95%."}],"label":"orig_split_2","skipStartButton":true,"perQuestionResponseAnswers":true,"perQuestionResponseMessaging":true,"preventUnanswered":true,"displayQuestionCount":false,"displayQuestionNumber":false,"disableRanking":true,"nextQuestionText":"","checkAnswerText":"Submit Answer","allowRetry":true,"randomSortAnswers":false,"json":{"info":{"name":"","main":""},"questions":[{"q":"What&#39;s the smallest survey size that leads to the correct prediction about 95% of the time?","a":[{"option":"About \\(n = 30\\).","correct":false,"message":null},{"option":"About \\(n = 50\\).","correct":false,"message":null},{"option":"About \\(n = 100\\).","correct":true,"message":null},{"option":"About \\(n = 250\\).","correct":false,"message":"That does better than 95%."}],"correct":"Correct!","incorrect":"Incorrect."}]}},"evals":[],"jsHooks":[]}</script>
+</div>
+<div id="section-survey-after-the-vote" class="section level2">
+<h2>Survey after the vote?</h2>
+<p>The logic in the previous section is inside-out. Knowing the result of the election, we could figure out how big a survey <span class="math inline">\(n\)</span> is needed to make a correct prediction 95% of the time. But obviously we don’t know the results at the time the survey would be made. How can we figure out how big a survey ought to be <em>before</em> we have the results?</p>
+<p>The answer might depend on how close the election is. To investigate this, let’s make a new data set where the election is quite close by turning the votes for Don Samuels into votes for Mark Andrew.</p>
+<pre class="r"><code>V &lt;- 
+Votes_for_mayor %&gt;%
+  mutate(vote = ifelse(vote == &quot;DON SAMUELS&quot;, &quot;MARK ANDREW&quot;, vote))
+counts( ~ vote, data = V)</code></pre>
+<pre><code>## vote
+## BETSY HODGES  MARK ANDREW        other 
+##        34083        34322        11696</code></pre>
+<p>This is enough to make the election very close. Mark Andrew comes out a little ahead.</p>
+We’ll do the simulation for opinion surveys on this new data set. Will the simulated survey show Mark Andrew as the winner? Try bigger and bigger sample sizes (the <code>size =</code> below)u ntil you find a size <span class="math inline">\(n\)</span> that has Mark Andrew winning, say, in 95% of the trials. You don’t need to go above $n = $10,000.
+<div class="tutorial-exercise" data-label="try-even" data-caption="Code" data-completion="1" data-diagnostics="1" data-startover="1" data-lines="0">
+<pre class="text"><code>Trials &lt;- Do(100) * 
+  counts( ~ vote, 
+          data = sample_n(V, size = 100))
+count_wins(Trials, &quot;MARK.ANDREW&quot;)</code></pre>
+<script type="application/json" data-opts-chunk="1">{"fig.width":6.5,"fig.height":4,"fig.retina":2,"fig.align":"default","fig.keep":"high","fig.show":"asis","out.width":624,"warning":true,"error":false,"message":true,"exercise.df_print":"paged","exercise.setup":"prepare-votes","exercise.checker":"NULL"}</script>
+</div>
+<div id="section-try-even-hint">
+The nature of surveys is that they are much smaller than the population from which the survey is taken. There are 80,000 votes in the data, so the maximum survey size we’ve asked you to check is <span class="math inline">\(n = 10,000\)</span>. Even at that big size, do the surveys reliably predict the actual outcome?
+</div>
+<p>We can’t get a reliable prediction at any size!</p>
+<p>Let’s summarise what we’ve found. In the surveys drawn from the actual data, where Betsy Hodges won by a large margin, we needed only a very small survey sample size to get reliable predictions. But in the second set of data, where Mark Andrew wins by only a small margin, we can’t get reliable predictions for any survey size.</p>
+</div>
+<div id="section-how-precise-a-result" class="section level2">
+<h2>How precise a result?</h2>
+<p>In the actual election, Betsy Hodges earned a substantially bigger proportion of the vote than any of the other candidates:</p>
+<pre class="r"><code>props( ~ vote, data = Votes_for_mayor)</code></pre>
+<pre><code>##      BETSY HODGES DON SAMUELS MARK ANDREW     other
+## [1,]    0.4255003   0.1449295   0.2835545 0.1460157</code></pre>
+<p>Betsy Hodges’ proportion is about 14 percentage points higher than the runner-up, Mark Andrew. Roughly speaking, if the survey sample is large enough to be precise to about 10 percentage points, the survey will reliably indicate Hodges as the winner.</p>
+<p>In the simulated election where the election was much closer, Mark Andrew wins by only a small proportion, 0.3 percentage points.</p>
+<pre class="r"><code>props( ~ vote, data = V)</code></pre>
+<pre><code>##      BETSY HODGES MARK ANDREW     other
+## [1,]    0.4255003    0.428484 0.1460157</code></pre>
+<p>In order for a survey sample to be able reliably to pick Mark Andrews as the winner, the survey result would need to be precise to about 0.15 percentage points. So the close election would require much more precision from the survey sample than does the election with a wide point spread.</p>
+</div>
+<div id="section-precision-of-polls" class="section level2">
+<h2>Precision of polls</h2>
+<p>The people running an voter opinion survey need to determine how many people to sample from the population. Obviously, they can’t wait until after the election to carry out the sorts of simulations we did in the preceeding sections. They have to work with the information they already have at hand <em>before</em> the election and, indeed, before the poll results are available.</p>
+<p>In actual practice, the available information can be very little or none. Instead, it’s typical for pollsters to decide what precision, or “margin of error,” they are willing to accept. For instance, professional polling organizations often aim for a margin of error of <span class="math inline">\(\mbox{E} \approx 0.03\)</span>, that is, 3 percentage points.</p>
+<p>In order to achieve a specified margin of error <span class="math inline">\(E\)</span>, the size of the poll <span class="math inline">\(n\)</span> ought to be no smaller than:</p>
+<p><span class="math display">\[n \approx \frac{1}{E^2}\]</span> Or, looking at the same relationship in another way, given a poll with <span class="math inline">\(n\)</span> participants, the margin of error will be</p>
+<p><span class="math display">\[E \approx \sqrt{\frac{1}{n}}\]</span></p>
+<div id="section-exercise" class="section level3">
+<h3>Exercise</h3>
+<p>Here is a command box where you can run the commands for the calculations needed in the equations</p>
+<div class="tutorial-exercise" data-label="margin-calc" data-caption="Code" data-completion="1" data-diagnostics="1" data-startover="1" data-lines="0">
+<pre class="text"><code># Find margin of error, given n
+n &lt;- 1000
+sqrt(1 / N)
+
+# Find n for a given margin of error
+E &lt;- 0.03 # each percentage point is 0.01
+1 / E^2</code></pre>
+<script type="application/json" data-opts-chunk="1">{"fig.width":6.5,"fig.height":4,"fig.retina":2,"fig.align":"default","fig.keep":"high","fig.show":"asis","out.width":624,"warning":true,"error":false,"message":true,"exercise.df_print":"paged","exercise.checker":"NULL"}</script>
+</div>
+<div class="panel panel-default">
+<div class="panel-heading tutorial-panel-heading">Poll sample size and precision</div>
+<table class="table quiz-table">
+<tr>
+<td>
+
+<div id="htmlwidget-99663fe4248a171ad2f9" style="width:100%;height:auto;", class = "quiz html-widget">
+<div class="panel panel-default">
+<div class="panel-body quizArea">
+</div>
+</div>
+</div>
+
+<script type="application/json" data-for="htmlwidget-99663fe4248a171ad2f9">{"x":{"question":"In the Minneapolis election, a poll with a margin of error of about 10 percentage points would have been able to predict the result of the election. What&#39;s the corresponding sample size \\(n\\)?","answers":[{"option":"10","correct":false,"message":null},{"option":"100","correct":true,"message":null},{"option":"1000","correct":false,"message":null},{"option":"10,000","correct":false,"message":null},{"option":"\\(>\\) 100,000","correct":false,"message":null}],"label":"margins-1","skipStartButton":true,"perQuestionResponseAnswers":true,"perQuestionResponseMessaging":true,"preventUnanswered":true,"displayQuestionCount":false,"displayQuestionNumber":false,"disableRanking":true,"nextQuestionText":"","checkAnswerText":"Submit Answer","allowRetry":false,"randomSortAnswers":false,"json":{"info":{"name":"","main":""},"questions":[{"q":"In the Minneapolis election, a poll with a margin of error of about 10 percentage points would have been able to predict the result of the election. What&#39;s the corresponding sample size \\(n\\)?","a":[{"option":"10","correct":false,"message":null},{"option":"100","correct":true,"message":null},{"option":"1000","correct":false,"message":null},{"option":"10,000","correct":false,"message":null},{"option":"\\(>\\) 100,000","correct":false,"message":null}],"correct":"Correct!","incorrect":"Incorrect."}]}},"evals":[],"jsHooks":[]}</script>
+</td>
+</tr>
+<tr>
+<td>
+
+<div id="htmlwidget-8b92403296358c9df20b" style="width:100%;height:auto;", class = "quiz html-widget">
+<div class="panel panel-default">
+<div class="panel-body quizArea">
+</div>
+</div>
+</div>
+
+<script type="application/json" data-for="htmlwidget-8b92403296358c9df20b">{"x":{"question":"In the simulated close election, a poll would need a precision of 0.15 percentage points to be able reliably to predict the outcome of the election. What&#39;s the corresponding sample size \\(n\\)?","answers":[{"option":"10","correct":false,"message":null},{"option":"100","correct":true,"message":null},{"option":"1000","correct":false,"message":null},{"option":"10,000","correct":false,"message":null},{"option":"\\(>\\) 100,000","correct":false,"message":null}],"label":"margins-2","skipStartButton":true,"perQuestionResponseAnswers":true,"perQuestionResponseMessaging":true,"preventUnanswered":true,"displayQuestionCount":false,"displayQuestionNumber":false,"disableRanking":true,"nextQuestionText":"","checkAnswerText":"Submit Answer","allowRetry":false,"randomSortAnswers":false,"json":{"info":{"name":"","main":""},"questions":[{"q":"In the simulated close election, a poll would need a precision of 0.15 percentage points to be able reliably to predict the outcome of the election. What&#39;s the corresponding sample size \\(n\\)?","a":[{"option":"10","correct":false,"message":null},{"option":"100","correct":true,"message":null},{"option":"1000","correct":false,"message":null},{"option":"10,000","correct":false,"message":null},{"option":"\\(>\\) 100,000","correct":false,"message":null}],"correct":"Correct!","incorrect":"Incorrect."}]}},"evals":[],"jsHooks":[]}</script>
+</td>
+</tr>
+</table>
+</div>
+</div>
+</div>
+<div id="section-confirming-the-precision-formula" class="section level2">
+<h2>Confirming the precision formula</h2>
+<p>How can you check that the formula for the margin of error, <span class="math inline">\(E = \sqrt{1/N}\)</span>, is correct? Here’s one way:</p>
+<p>Suppose you create a population of some large size <span class="math inline">\(N\)</span> where fraction <span class="math inline">\(p\)</span> of the population votes for Betsy Hodges. From that population, you can take simulated samples of size <span class="math inline">\(n\)</span>, for any <span class="math inline">\(n\)</span> you choose. Each of those samples will give an estimate of <span class="math inline">\(p\)</span>. You can look at the 95% coverage interval across all of the simulation trials. The margin of error will be half the width of the coverage interval.</p>
+<div class="tutorial-exercise" data-label="vote_sim_2" data-caption="Code" data-completion="1" data-diagnostics="1" data-startover="1" data-lines="0">
+<pre class="text"><code>N &lt;- 10000
+p &lt;- 0.48 # between zero and one
+Sim_votes &lt;- vote_sim(hodges_frac = p, pop_size = N)
+props( ~ vote, data = Sim_votes)
+
+# Simulated samples of size n
+n &lt;- 50
+Trials &lt;- Do(100) * 
+  props( ~ vote, 
+           data = sample_n(Sim_votes, size = n))
+gf_density( ~ `BETSY.HODGES`, data = Trials)
+qstats( ~ `BETSY.HODGES`, data = Trials, coverage)</code></pre>
+<script type="application/json" data-opts-chunk="1">{"fig.width":6.5,"fig.height":4,"fig.retina":2,"fig.align":"default","fig.keep":"high","fig.show":"asis","out.width":624,"warning":true,"error":false,"message":true,"exercise.df_print":"paged","exercise.setup":"prepare-votes","exercise.checker":"NULL"}</script>
+</div>
+<div id="section-exercise-1" class="section level3">
+<h3>Exercise</h3>
+<p>Run the code block above multiple times as indicated in each of the questions. You may want to write down the coverage intervals produced by the statements. Keep in mind that the margin of error is one-half the width of the coverage interval. Remember to pay attention to whether you’re being asked to change little <span class="math inline">\(n\)</span>, the size of the sample, or big <span class="math inline">\(N\)</span>, the size of the population.</p>
+<div class="panel panel-default">
+<div class="panel-heading tutorial-panel-heading">Little n and big N</div>
+<table class="table quiz-table">
+<tr>
+<td>
+
+<div id="htmlwidget-b90bfd47b751f4675543" style="width:100%;height:auto;", class = "quiz html-widget">
+<div class="panel panel-default">
+<div class="panel-body quizArea">
+</div>
+</div>
+</div>
+
+<script type="application/json" data-for="htmlwidget-b90bfd47b751f4675543">{"x":{"question":"Using the code block above and holding big N at 100,000, try poll sample sizes of little n \\(=\\) 50, 200, 800, 3200. What happens to the margin of error as n increases?","answers":[{"option":"The margin of error is bigger when n is bigger.","correct":false,"message":null},{"option":"The margin of error is smaller when n is bigger.","correct":true,"message":null},{"option":"There is no relationship between the size of the margin of error and the sample size n.","correct":false,"message":null}],"label":"prop-ci-1","skipStartButton":true,"perQuestionResponseAnswers":true,"perQuestionResponseMessaging":true,"preventUnanswered":true,"displayQuestionCount":false,"displayQuestionNumber":false,"disableRanking":true,"nextQuestionText":"","checkAnswerText":"Submit Answer","allowRetry":false,"randomSortAnswers":false,"json":{"info":{"name":"","main":""},"questions":[{"q":"Using the code block above and holding big N at 100,000, try poll sample sizes of little n \\(=\\) 50, 200, 800, 3200. What happens to the margin of error as n increases?","a":[{"option":"The margin of error is bigger when n is bigger.","correct":false,"message":null},{"option":"The margin of error is smaller when n is bigger.","correct":true,"message":null},{"option":"There is no relationship between the size of the margin of error and the sample size n.","correct":false,"message":null}],"correct":"Correct!","incorrect":"Incorrect."}]}},"evals":[],"jsHooks":[]}</script>
+</td>
+</tr>
+<tr>
+<td>
+
+<div id="htmlwidget-1a050a76ec55f5a0971c" style="width:100%;height:auto;", class = "quiz html-widget">
+<div class="panel panel-default">
+<div class="panel-body quizArea">
+</div>
+</div>
+</div>
+
+<script type="application/json" data-for="htmlwidget-1a050a76ec55f5a0971c">{"x":{"question":"Using the code block above and holding little n at 1000, try population sizes N of 5000, 20,000, 80,000, and 320,000. What happens to the margin of error as N increases?","answers":[{"option":"The margin of error is bigger when N is bigger.","correct":false,"message":null},{"option":"The margin of error is smaller when N is bigger.","correct":false,"message":null},{"option":"The margin of error is pretty much the same regardless of the population size N.","correct":true,"message":null}],"label":"prop-ci-2","skipStartButton":true,"perQuestionResponseAnswers":true,"perQuestionResponseMessaging":true,"preventUnanswered":true,"displayQuestionCount":false,"displayQuestionNumber":false,"disableRanking":true,"nextQuestionText":"","checkAnswerText":"Submit Answer","allowRetry":false,"randomSortAnswers":false,"json":{"info":{"name":"","main":""},"questions":[{"q":"Using the code block above and holding little n at 1000, try population sizes N of 5000, 20,000, 80,000, and 320,000. What happens to the margin of error as N increases?","a":[{"option":"The margin of error is bigger when N is bigger.","correct":false,"message":null},{"option":"The margin of error is smaller when N is bigger.","correct":false,"message":null},{"option":"The margin of error is pretty much the same regardless of the population size N.","correct":true,"message":null}],"correct":"Correct!","incorrect":"Incorrect."}]}},"evals":[],"jsHooks":[]}</script>
+</td>
+</tr>
+</table>
+</div>
+<p>Recall the formula given above:</p>
+<p><span class="math display">\[E \approx \sqrt{\frac{1}{n}}\]</span></p>
+<p>This formula suggests that if the sample size <span class="math inline">\(n\)</span> were increased by a factor of 4, the margin of error will shrink by a factor of <span class="math inline">\(\sqrt{4} = 2\)</span>. Check whether this seems to be the case in your experiments with the code chunk.</p>
+</div>
+</div>
+<div id="section-why-pm-3" class="section level2">
+<h2>Why <span class="math inline">\(\pm 3\)</span>%?</h2>
+<p>Why do pollsters so often set their target margin of error at 3 percentage points? The target doesn’t need to be this; you should set it to whatever is appropriate for the problem you are dealing with.</p>
+<p>Pollsters often have in mind the idea of a “landslide” election. If the poll indicates a landslide, the pollsters want to be absolutely sure that the election is not going to turn out the other way. A common definition of a landslide win is getting more than 60% of the vote. On the other hand, a pretty close vote might involving winning with 52% of the vote. The pollsters want to make sure that if they get a landslide result in their poll, the margin of error doesn’t come anywhere near what it would for a close vote. By targeting a 3 percentage point margin of error, a close-vote result is almost certain to be within the interval <span class="math inline">\(52 \pm 3\)</span>%, which is less than 55%.</p>
+<p>On the other hand, in a landslide situation, the pollsters don’t want to get a result that is anything like a close-vote result. Remember, at a margin of error of 3 percentage points, the close-vote poll result is almost surely below 55%. And the landslide poll result is almost surely above 57%. Thus, a 3 percentage point margin of error keeps the possible poll results for a close-vote and a landslide-vote situation completely separate. If the target margin of error were 5 percentage points, a close-vote situation and a landslide vote situation might result in exactly the same poll results!</p>
+</div>
+<div id="section-precision-of-trends" class="section level2">
+<h2>Precision of “trends”</h2>
+<p>Many people look at successive polls to see if there is a “trend” from one poll to the next, for instance whether the candidates popularity is falling. It’s easy enough to quantify the trend: subtract the earlier poll result from the later poll’s result.</p>
+<p>It’s important, though, to know what is the margin of error in that difference. It is <em>not</em> simply the margin of error of each poll, nor even the sum of the two polls’ margin of error. Instead, it is in-between.</p>
+<p>The following code block simulates a situation where there is a slight upward trend for Betsy Hodges of 3 percentage points. A <em>before</em> and <em>after</em> poll is conducted, and we want to look at the difference from before to after.</p>
+<div class="tutorial-exercise" data-label="trends" data-caption="Code" data-completion="1" data-diagnostics="1" data-startover="1" data-lines="0">
+<pre class="text"><code># Simulation for the whole population
+N &lt;- 10000
+Before &lt;- vote_sim(hodges_frac = 0.48, pop_size = N) %&gt;%
+  mutate(when = &quot;before&quot;)
+After &lt;- vote_sim(hodges_frac = 0.51, pop_size = N) %&gt;%
+  mutate(when = &quot;after&quot;)
+All_the_data &lt;- rbind(Before, After)
+# Look at the whole population
+props( vote ~ when, data = All_the_data, tidy = TRUE) %&gt;%
+  tidyr::spread(key = proportion, value = Freq) %&gt;%
+  mutate(change = after - before) 
+
+# Look at samples of size n
+n &lt;- 8000
+Trials &lt;- Do(100) * {
+  props( vote ~ when, 
+       data = sample_n(All_the_data, size = n), 
+       tidy = TRUE) %&gt;%
+  tidyr::spread(key = proportion, value = Freq) %&gt;%
+  mutate(change = after - before) 
+}
+# Calculate the coverage intervals of the trials
+qstats(change ~ vote, data = Trials, coverage)</code></pre>
+<script type="application/json" data-opts-chunk="1">{"fig.width":6.5,"fig.height":4,"fig.retina":2,"fig.align":"default","fig.keep":"high","fig.show":"asis","out.width":624,"warning":true,"error":false,"message":true,"exercise.df_print":"paged","exercise.setup":"prepare-votes","exercise.checker":"NULL"}</script>
+</div>
+<p>Run the code block to see the confidence interval for before-and-after polls of size n <span class="math inline">\(=\)</span> 1000 each. As before, we’re calculating the by running many simulated polls and taking the 95% coverage interval on the results.</p>
+<div id="section-exercise-2" class="section level3">
+<h3>Exercise</h3>
+<p>If the confidence interval on the difference between the polls includes zero, there’s little evidence that there is a trend. Using the code block above, run the simulation for n <span class="math inline">\(=\)</span> 1000, 2000, 4000, and 8000.</p>
+<p>We set up the simulation so that the trend was from 48% to 51%, which is a 3 percentage point upward trend.</p>
+
+<div id="htmlwidget-3b43a82eb86f4b0023c6" style="width:100%;height:auto;", class = "quiz html-widget">
+<div class="panel panel-default">
+<div class="panel-body quizArea">
+</div>
+</div>
+</div>
+
+<script type="application/json" data-for="htmlwidget-3b43a82eb86f4b0023c6">{"x":{"question":"What sample size n is required so that you can safely conclude there is an upward trend of at least 1 percentage point?","answers":[{"option":"n = 1000","correct":false,"message":null},{"option":"n = 2000","correct":false,"message":null},{"option":"n = 4000","correct":false,"message":null},{"option":"n = 8000","correct":true,"message":null}],"label":"trends2","skipStartButton":true,"perQuestionResponseAnswers":true,"perQuestionResponseMessaging":true,"preventUnanswered":true,"displayQuestionCount":false,"displayQuestionNumber":false,"disableRanking":true,"nextQuestionText":"","checkAnswerText":"Submit Answer","allowRetry":false,"randomSortAnswers":false,"json":{"info":{"name":"","main":""},"questions":[{"q":"What sample size n is required so that you can safely conclude there is an upward trend of at least 1 percentage point?","a":[{"option":"n = 1000","correct":false,"message":null},{"option":"n = 2000","correct":false,"message":null},{"option":"n = 4000","correct":false,"message":null},{"option":"n = 8000","correct":true,"message":null}],"correct":"Correct!","incorrect":"Incorrect."}]}},"evals":[],"jsHooks":[]}</script> 
+<script type="application/shiny-prerendered" data-context="server-start">
+library(learnr)
+library(statPREP)
+library(dplyr)
+library(ggformula)
+library(mosaic)
+knitr::opts_chunk$set(echo = FALSE)
+load("Votes_for_mayor.rda")
+</script>
+ 
+<script type="application/shiny-prerendered" data-context="server">
+learnr:::register_http_handlers(session, metadata = NULL)
+</script>
+ 
+<script type="application/shiny-prerendered" data-context="server">
+`tutorial-exercise-orig_split-result` <- learnr:::setup_exercise_handler(reactive(req(input$`tutorial-exercise-orig_split-code-editor`)), session)
+output$`tutorial-exercise-orig_split-output` <- renderUI({
+  `tutorial-exercise-orig_split-result`()
+})
+</script>
+ 
+<script type="application/shiny-prerendered" data-context="server">
+`tutorial-exercise-try-even-result` <- learnr:::setup_exercise_handler(reactive(req(input$`tutorial-exercise-try-even-code-editor`)), session)
+output$`tutorial-exercise-try-even-output` <- renderUI({
+  `tutorial-exercise-try-even-result`()
+})
+</script>
+ 
+<script type="application/shiny-prerendered" data-context="server">
+`tutorial-exercise-margin-calc-result` <- learnr:::setup_exercise_handler(reactive(req(input$`tutorial-exercise-margin-calc-code-editor`)), session)
+output$`tutorial-exercise-margin-calc-output` <- renderUI({
+  `tutorial-exercise-margin-calc-result`()
+})
+</script>
+ 
+<script type="application/shiny-prerendered" data-context="server">
+`tutorial-exercise-vote_sim_2-result` <- learnr:::setup_exercise_handler(reactive(req(input$`tutorial-exercise-vote_sim_2-code-editor`)), session)
+output$`tutorial-exercise-vote_sim_2-output` <- renderUI({
+  `tutorial-exercise-vote_sim_2-result`()
+})
+</script>
+ 
+<script type="application/shiny-prerendered" data-context="server">
+`tutorial-exercise-trends-result` <- learnr:::setup_exercise_handler(reactive(req(input$`tutorial-exercise-trends-code-editor`)), session)
+output$`tutorial-exercise-trends-output` <- renderUI({
+  `tutorial-exercise-trends-result`()
+})
+</script>
+ <!--html_preserve-->
+<script type="application/shiny-prerendered" data-context="dependencies">
+{"type":"list","attributes":{},"value":[{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["jquery"]},{"type":"character","attributes":{},"value":["1.11.3"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/jquery-1.11.3"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["jquery.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["bootstrap"]},{"type":"character","attributes":{},"value":["3.3.5"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/bootstrap-3.3.5"]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["viewport"]}},"value":[{"type":"character","attributes":{},"value":["width=device-width, initial-scale=1"]}]},{"type":"character","attributes":{},"value":["js/bootstrap.min.js","shim/html5shiv.min.js","shim/respond.min.js"]},{"type":"character","attributes":{},"value":["css/cerulean.min.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["pagedtable"]},{"type":"character","attributes":{},"value":["1.1"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/pagedtable-1.1"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["js/pagedtable.js"]},{"type":"character","attributes":{},"value":["css/pagedtable.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["highlightjs"]},{"type":"character","attributes":{},"value":["1.1"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/highlightjs-1.1"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["highlight.js"]},{"type":"character","attributes":{},"value":["textmate.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial.js"]},{"type":"character","attributes":{},"value":["tutorial.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial-autocompletion"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial-autocompletion.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial-diagnostics"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial-diagnostics.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial-format"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmarkdown/templates/tutorial/resources"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial-format.js"]},{"type":"character","attributes":{},"value":["tutorial-format.css","rstudio-theme.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["jquery"]},{"type":"character","attributes":{},"value":["1.11.3"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/jquery-1.11.3"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["jquery.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["font-awesome"]},{"type":"character","attributes":{},"value":["4.5.0"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/font-awesome-4.5.0"]}]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["css/font-awesome.min.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["bootbox"]},{"type":"character","attributes":{},"value":["4.4.0"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/bootbox"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["bootbox.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["localforage"]},{"type":"character","attributes":{},"value":["1.4.3"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/localforage"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["localforage.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial.js"]},{"type":"character","attributes":{},"value":["tutorial.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial-autocompletion"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial-autocompletion.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial-diagnostics"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial-diagnostics.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["ace"]},{"type":"character","attributes":{},"value":["1.2.6"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/ace"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["ace.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["clipboardjs"]},{"type":"character","attributes":{},"value":["1.5.15"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/clipboardjs"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["clipboard.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["htmlwidgets"]},{"type":"character","attributes":{},"value":["0.8"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["www"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["htmlwidgets.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["htmlwidgets"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["quiz-binding"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["htmlwidgets"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["quiz.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[false]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["jquery"]},{"type":"character","attributes":{},"value":["1.11.3"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/jquery-1.11.3"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["jquery.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["bootstrap"]},{"type":"character","attributes":{},"value":["3.3.5"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/bootstrap-3.3.5"]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["viewport"]}},"value":[{"type":"character","attributes":{},"value":["width=device-width, initial-scale=1"]}]},{"type":"character","attributes":{},"value":["js/bootstrap.min.js","shim/html5shiv.min.js","shim/respond.min.js"]},{"type":"character","attributes":{},"value":["css/bootstrap.min.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["bootbox"]},{"type":"character","attributes":{},"value":["4.4.0"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/bootbox"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["bootbox.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["localforage"]},{"type":"character","attributes":{},"value":["1.4.3"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/localforage"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["localforage.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial.js"]},{"type":"character","attributes":{},"value":["tutorial.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial-autocompletion"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial-autocompletion.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial-diagnostics"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial-diagnostics.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["slickquiz"]},{"type":"character","attributes":{},"value":["1.5.20"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["htmlwidgets/lib/slickquiz"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["js/slickQuiz.js"]},{"type":"character","attributes":{},"value":["css/slickQuiz.css","css/slickQuizTutorial.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["ace"]},{"type":"character","attributes":{},"value":["1.2.6"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/ace"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["ace.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["clipboardjs"]},{"type":"character","attributes":{},"value":["1.5.15"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/clipboardjs"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["clipboard.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["ace"]},{"type":"character","attributes":{},"value":["1.2.6"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/ace"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["ace.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["clipboardjs"]},{"type":"character","attributes":{},"value":["1.5.15"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/clipboardjs"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["clipboard.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["htmlwidgets"]},{"type":"character","attributes":{},"value":["0.8"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["www"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["htmlwidgets.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["htmlwidgets"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["quiz-binding"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["htmlwidgets"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["quiz.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[false]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["jquery"]},{"type":"character","attributes":{},"value":["1.11.3"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/jquery-1.11.3"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["jquery.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["bootstrap"]},{"type":"character","attributes":{},"value":["3.3.5"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/bootstrap-3.3.5"]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["viewport"]}},"value":[{"type":"character","attributes":{},"value":["width=device-width, initial-scale=1"]}]},{"type":"character","attributes":{},"value":["js/bootstrap.min.js","shim/html5shiv.min.js","shim/respond.min.js"]},{"type":"character","attributes":{},"value":["css/bootstrap.min.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["bootbox"]},{"type":"character","attributes":{},"value":["4.4.0"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/bootbox"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["bootbox.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["localforage"]},{"type":"character","attributes":{},"value":["1.4.3"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/localforage"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["localforage.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial.js"]},{"type":"character","attributes":{},"value":["tutorial.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial-autocompletion"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial-autocompletion.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial-diagnostics"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial-diagnostics.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["slickquiz"]},{"type":"character","attributes":{},"value":["1.5.20"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["htmlwidgets/lib/slickquiz"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["js/slickQuiz.js"]},{"type":"character","attributes":{},"value":["css/slickQuiz.css","css/slickQuizTutorial.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["ace"]},{"type":"character","attributes":{},"value":["1.2.6"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/ace"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["ace.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["clipboardjs"]},{"type":"character","attributes":{},"value":["1.5.15"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/clipboardjs"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["clipboard.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["htmlwidgets"]},{"type":"character","attributes":{},"value":["0.8"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["www"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["htmlwidgets.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["htmlwidgets"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["quiz-binding"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["htmlwidgets"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["quiz.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[false]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["jquery"]},{"type":"character","attributes":{},"value":["1.11.3"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/jquery-1.11.3"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["jquery.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["bootstrap"]},{"type":"character","attributes":{},"value":["3.3.5"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/bootstrap-3.3.5"]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["viewport"]}},"value":[{"type":"character","attributes":{},"value":["width=device-width, initial-scale=1"]}]},{"type":"character","attributes":{},"value":["js/bootstrap.min.js","shim/html5shiv.min.js","shim/respond.min.js"]},{"type":"character","attributes":{},"value":["css/bootstrap.min.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["bootbox"]},{"type":"character","attributes":{},"value":["4.4.0"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/bootbox"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["bootbox.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["localforage"]},{"type":"character","attributes":{},"value":["1.4.3"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/localforage"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["localforage.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial.js"]},{"type":"character","attributes":{},"value":["tutorial.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial-autocompletion"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial-autocompletion.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial-diagnostics"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial-diagnostics.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["slickquiz"]},{"type":"character","attributes":{},"value":["1.5.20"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["htmlwidgets/lib/slickquiz"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["js/slickQuiz.js"]},{"type":"character","attributes":{},"value":["css/slickQuiz.css","css/slickQuizTutorial.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["ace"]},{"type":"character","attributes":{},"value":["1.2.6"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/ace"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["ace.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["clipboardjs"]},{"type":"character","attributes":{},"value":["1.5.15"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/clipboardjs"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["clipboard.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["htmlwidgets"]},{"type":"character","attributes":{},"value":["0.8"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["www"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["htmlwidgets.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["htmlwidgets"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["quiz-binding"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["htmlwidgets"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["quiz.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[false]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["jquery"]},{"type":"character","attributes":{},"value":["1.11.3"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/jquery-1.11.3"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["jquery.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["bootstrap"]},{"type":"character","attributes":{},"value":["3.3.5"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/bootstrap-3.3.5"]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["viewport"]}},"value":[{"type":"character","attributes":{},"value":["width=device-width, initial-scale=1"]}]},{"type":"character","attributes":{},"value":["js/bootstrap.min.js","shim/html5shiv.min.js","shim/respond.min.js"]},{"type":"character","attributes":{},"value":["css/bootstrap.min.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["bootbox"]},{"type":"character","attributes":{},"value":["4.4.0"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/bootbox"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["bootbox.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["localforage"]},{"type":"character","attributes":{},"value":["1.4.3"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/localforage"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["localforage.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial.js"]},{"type":"character","attributes":{},"value":["tutorial.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial-autocompletion"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial-autocompletion.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial-diagnostics"]},{"type":"character","attributes":{},"value":["0.8.0.9003"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial-diagnostics.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["slickquiz"]},{"type":"character","attributes":{},"value":["1.5.20"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["htmlwidgets/lib/slickquiz"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["js/slickQuiz.js"]},{"type":"character","attributes":{},"value":["css/slickQuiz.css","css/slickQuizTutorial.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]}]}
+</script>
+<!--/html_preserve-->
+</div>
+</div>
+
+</div> <!-- topics -->
+
+<div class="topicsContainer">
+<div class="topicsPositioner">
+<div class="band">
+<div class="bandContent topicsListContainer">
+
+<!-- begin doc-metadata -->
+<div id="doc-metadata">
+<h2 class="title toc-ignore" style="display:none;">Polls and prediction</h2>
+</div>
+<!-- end doc-metadata -->
+
+</div> <!-- bandContent.topicsListContainer -->
+</div> <!-- band -->
+</div> <!-- topicsPositioner -->
+</div> <!-- topicsContainer -->
+
+
+</div> <!-- bandContent page -->
+</div> <!-- pageContent band -->
+
+
+
+
+<script>
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+</script>
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+
+</html>

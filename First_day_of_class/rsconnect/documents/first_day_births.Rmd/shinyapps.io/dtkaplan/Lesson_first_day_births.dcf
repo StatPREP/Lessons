@@ -1,0 +1,12 @@
+name: Lesson_first_day_births
+title: Lesson_first_day_births
+username:
+account: dtkaplan
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 344783
+bundleId: 1419056
+url: https://dtkaplan.shinyapps.io/Lesson_first_day_births/
+when: 1528469960.89032
+asMultiple: FALSE
+asStatic: FALSE

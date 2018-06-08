@@ -1,0 +1,12 @@
+name: Lesson_read_class_data
+title: Lesson_read_class_data
+username:
+account: dtkaplan
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 350004
+bundleId: 1396983
+url: https://dtkaplan.shinyapps.io/Lesson_read_class_data/
+when: 1527531168.8163
+asMultiple: FALSE
+asStatic: FALSE

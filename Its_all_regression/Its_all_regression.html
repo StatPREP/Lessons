@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8">
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+
+
+
+<meta name="progressive" content="false" />
+<meta name="allow-skip" content="false" />
+
+<title>Unifying inference with regression</title>
+
+
+<!-- highlightjs -->
+<style type="text/css">code{white-space: pre;}</style>
+<style type="text/css">
+  pre:not([class]) {
+    background-color: white;
+  }
+</style>
+<script type="text/javascript">
+if (window.hljs && document.readyState && document.readyState === "complete") {
+   window.setTimeout(function() {
+      hljs.initHighlighting();
+   }, 0);
+}
+</script>
+
+
+
+</head>
+
+<body>
+
+
+
+<div class="pageContent band">
+<div class="bandContent page">
+
+<div class="topics">
+
+<div id="section-background" class="section level2">
+<h2>Background</h2>
+<p>Introductory statistics curricula are filled with topic after topic. The <a href="http://www.amstat.org/asa/files/pdfs/GAISE/GaiseCollege_Full.pdf">GAISE College report</a> rightly identifies this as a problem, recommending that instructors “avoid the unfortunate, but not uncommon, reality that many students leave their introductory course thinking of statistics only as a disconnected collection of methods and tools.” (p. 13) The report goes on to recommend that instructors “focus on students’ understanding of key concepts, illustrated by a few techniques” and “pare down content of an introductory course to focus on core concepts in more depth.” (p. 16)</p>
+<p>It’s hard to argue with this. But what are the “key” or “core” concepts or techniques of statistics? GAISE points to nine goals for students in introductory courses. These are a mix of concepts to be understood (e.g. randomness, variation) and technical skills. The technical skills are:</p>
+<blockquote>
+<ol start="3" style="list-style-type: decimal">
+<li>Students should be able to produce <strong>graphical displays</strong> and <strong>numerical summaries</strong> and interpret what graphs do and do not reveal.</li>
+</ol>
+</blockquote>
+<blockquote>
+<ol start="6" style="list-style-type: decimal">
+<li>Students should gain experience with how <strong>statistical models</strong>, including multivariable models, are used.</li>
+</ol>
+</blockquote>
+<blockquote>
+<ol start="7" style="list-style-type: decimal">
+<li>Students should demonstrate an … ability to use basic ideas of <strong>statistical inference</strong>, both hypothesis tests and interval estimation, in a variety of settings.</li>
+</ol>
+</blockquote>
+<blockquote>
+<ol start="8" style="list-style-type: decimal">
+<li>Students should be able to interpret and draw conclusions from <strong>standard output from statistical software</strong> packages.</li>
+</ol>
+</blockquote>
+<p>Other StatPREP tutorialsabout <a href="https://dtkaplan.shinyapps.io/tutorial_data_science_graphics/">graphical displays</a> and <a href="https://dtkaplan.shinyapps.io/Tutorial_Calculating_statistics/">numerical summaries</a> introduce techniques relevant to goal (3). This tutorial is about goals (6), (7), and (8). In particular, I want to show you how one technique, regression, can be used to achieve all three of those goals.</p>
+</div>
+<div id="section-statistical-models-and-regression" class="section level2">
+<h2>Statistical models and regression</h2>
+<p>We often think about introductory stats in terms of a few descriptive statistics: means, proportions, counts. They provide a way to summarize data. A richer way to summarize data is using the <strong>statistical modeling paradigm</strong>:</p>
+<p><em>There is a response variable and one or more explanatory variables. We describe the relationship between the explanatory variable(s) and the response by constructing a mathematical function that takes values of the explanatory variables as input and produces an output value consistent with the patterns implicit in data.</em></p>
+<p>Regression is a general technique for constructing such a function from data when the response variable is quantitative. (Models that have a categorical response variable are called “classifiers.”) An important regression tool in R is the <code>lm()</code> function. <code>lm()</code> is used like other goal/formula/data template functions.</p>
+<ul>
+<li><code>lm()</code> is the goal. There are other, similar goals such as <code>rlm()</code> and <code>glm()</code> and even <code>randomForest</code>. All these functions build models.</li>
+<li>the formula specifies which variable is the response and which are explanatory. It also contains other information, such as how flexible or curvey the function ought to be.</li>
+<li>the data are those used to search for patterns.</li>
+</ul>
+<p>To illustrate, we’ll use data from the Current Population Survey recording workers’ wages, the sector of the economy in which they work, their age and educational achievement, and other demographic information. The data frame is called <code>CPS85</code>. We’ll try to explain the wage (in dollars per hour) using various of the other variables. For instance, the following command block constructs two models: one involving a quantitative explanatory variable, the other a categorical explanatory variable. (And, of course, the response variable in regression is always quantitative: that’s wage here.)</p>
+<div class="tutorial-exercise" data-label="two-models" data-caption="Code" data-completion="1" data-diagnostics="1" data-startover="1" data-lines="0">
+<pre class="text"><code>modelA &lt;- lm(wage ~ educ, data = CPS85)
+modelB &lt;- lm(wage ~ sex, data = CPS85)
+# You won&#39;t see any output because we&#39;re storing the results, not printing them.</code></pre>
+<script type="application/json" data-opts-chunk="1">{"fig.width":6.5,"fig.height":4,"fig.retina":2,"fig.align":"default","fig.keep":"high","fig.show":"asis","out.width":624,"warning":true,"error":false,"message":true,"exercise.df_print":"paged","exercise.checker":"NULL"}</script>
+</div>
+<p>The only part that requires thought is the choice of an appropriate response variable and explanatory varible(s) to address the research question motivating the statistical analysis. Model A would be appropriate for a research question “How does education contribute to wage?” Model B might be, “By what amount, if any, do wages differ between the sexes.”</p>
+<p>You might be curious to look at Models A and B. But there are many different ways to look at them, and it’s important to know which is which.</p>
+<ol style="list-style-type: decimal">
+<li>Graph the model function. Use <code>mod_plot()</code>, for instance <code>mod_plot(modelA)</code>.</li>
+<li><p>Evaluate the model function for specified inputs. This can be as simple as <code>mod_eval(modelA)</code> which will choose a couple of “typical” input values. Or, you can specify the inputs using arguments to <code>mod_eval()</code>, for instance</p>
+<pre class="r"><code>mod_eval(modelA, educ = 12)
+mod_eval(modelB, sex = &quot;F&quot;)</code></pre></li>
+<li><p>Calculate the effect size, that is, how much the output changes for a change in input. This is done with <code>mod_effect()</code>. Example: to look at how wage changes with eduction or with sex, use</p>
+<pre class="r"><code>mod_effect(ModelA, ~ educ)
+mod_effect(ModelB, ~ sex)</code></pre></li>
+</ol>
+<p>Neither <code>mod_plot()</code>, <code>mod_eval()</code> nor <code>mod_effect()</code> are goal/formula/data template functions. There’s no <code>data =</code> argument for any of them. The formula in <code>mod_effect()</code> specifies <em>which explanatory variable</em> to find the effect size for. That’s obvious here since there is only one explanatory variable in each of those models. But you can also build models with multiple explanatory variables.</p>
+<p>Go back to the command block and add in statements to plot the models, evaluate the models, and calculate the effect size. Try to interpret the results in everyday terms.</p>
+</div>
+<div id="section-confidence-intervals" class="section level2">
+<h2>Confidence intervals</h2>
+<p>The basic logic of confidence intervals is to recalculate the model value or effect size on many different samples taken from the population. At the data modeling stage, we don’t have the population at hand, so we simulate the sampling process by taking <strong>resamples</strong> from the data. Each of these models constructed on a single resample is called a “trial.” A set of trials is called a “bootstrap ensemble”. In the following, we’ll create a 5-member bootstrap ensemble and apply <code>mod_plot()</code>, <code>mod_eval()</code>, and <code>mod_effect()</code> to that.</p>
+<div class="tutorial-exercise" data-label="bootstrap1" data-caption="Code" data-completion="1" data-diagnostics="1" data-startover="1" data-lines="0">
+<pre class="text"><code>modelA &lt;- lm(wage ~ educ, data = CPS85)
+ensembleA &lt;- mod_ensemble(modelA, nreps = 5)
+mod_plot(ensembleA)
+mod_eval(ensembleA)
+mod_effect(ensembleA, ~ educ)</code></pre>
+<script type="application/json" data-opts-chunk="1">{"fig.width":6.5,"fig.height":4,"fig.retina":2,"fig.align":"default","fig.keep":"high","fig.show":"asis","out.width":624,"warning":true,"error":false,"message":true,"exercise.df_print":"paged","exercise.checker":"NULL"}</script>
+</div>
+<p>You can use the <code>gf_point()</code> or <code>df_stats()</code> to show the spread of trials or the confidence intervals. Typically, one would use and ensemble of 100 trials. We’ve used just 5 here to avoid overcrowding the display.</p>
+<p>Exercise: Use 100 trials and display the spread of trials with <code>gf_point()</code>.</p>
+<p>One of the nice things about <code>lm()</code> is that you can get a confidence interval on the model output using “normal theory.” Once students understand the variation introduced by sampling, this can simplify discussion.</p>
+<div class="tutorial-exercise" data-label="intervals1" data-caption="Code" data-completion="1" data-diagnostics="1" data-startover="1" data-lines="0">
+<pre class="text"><code>modelA &lt;- lm(wage ~ educ, data = CPS85)
+mod_eval(modelA, interval = &quot;confidence&quot;)
+mod_eval(modelA, interval = &quot;prediction&quot;)</code></pre>
+<script type="application/json" data-opts-chunk="1">{"fig.width":6.5,"fig.height":4,"fig.retina":2,"fig.align":"default","fig.keep":"high","fig.show":"asis","out.width":624,"warning":true,"error":false,"message":true,"exercise.df_print":"paged","exercise.checker":"NULL"}</script>
+</div>
+<p>There’s also a prediction interval which emphasizes the range of possible outcomes for individuals. So even when the confidence intervals don’t overlap, the predictions may overlap quite a lot.</p>
+</div>
+<div id="section-standard-output-from-statistical-software" class="section level2">
+<h2>Standard output from statistical software</h2>
+<p>The two main kinds of “standard” output are</p>
+<ul>
+<li>regression tables</li>
+<li>ANOVA</li>
+</ul>
+<div class="tutorial-exercise" data-label="standard-output" data-caption="Code" data-completion="1" data-diagnostics="1" data-startover="1" data-lines="0">
+<pre class="text"><code>modelA &lt;- lm(wage ~ educ, data = CPS85)
+summary(modelA)
+anova(modelA)</code></pre>
+<script type="application/json" data-opts-chunk="1">{"fig.width":6.5,"fig.height":4,"fig.retina":2,"fig.align":"default","fig.keep":"high","fig.show":"asis","out.width":624,"warning":true,"error":false,"message":true,"exercise.df_print":"paged","exercise.checker":"NULL"}</script>
+</div>
+</div>
+<div id="section-the-usual-hypothesis-tests" class="section level2">
+<h2>The usual hypothesis tests</h2>
+<p>Many intro stats courses cover (or hope to cover) these settings for inference.</p>
+<ol style="list-style-type: lower-alpha">
+<li>inference on a single mean</li>
+<li>inference on a single proportion</li>
+<li>inference comparing two means</li>
+<li>inference comparing two proportions</li>
+<li>inference on simple regression</li>
+<li>one-way ANOVA</li>
+<li>two-way ANOVA</li>
+<li>inference on counts (e.g. Chi-squared test)</li>
+</ol>
+<p>And then there are the versions that are robust to outliers, typically involving non-parametric techniques such as rank-sum tests.</p>
+<p>This section shows how to all these tests with the tools covered above. But we need two new ideas.</p>
+<p><strong>Idea 1. “Single mean” or “single proportion”</strong>, when translated to modeling terms. means that there is no explanatory variable. As a formula, this is written with a <code>1</code> on the right-hand side of the formula, for instance, <code>wage ~ 1</code>. <strong>Idea 2. Proportions are means</strong>. If we are interested in examining the proportion of cases in which a categorical level takes on a specified value, we can translate the categorical variable into a quantitative 0-or-1 variable and calculate the proportion by taking the mean of the 0-or-1 variable. For example, the proportion of workers who are female in <code>CPS85</code> can be studied by using <code>sex == 'F'&quot; as the response variable. The response variable for studying the proportion of workers who work in construction is</code>sector == ‘const’<code>. The response variable for studying the proportion of workers who earn more than $12/hr is</code>wage &gt; 12`.</p>
+<div id="section-a.-inference-on-a-single-mean" class="section level3">
+<h3>a. Inference on a single mean</h3>
+<p>Consider the model of wage as a function of … nothing! That is, <code>wage ~ 1</code>, which is the single model value representing every row of the data.</p>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["null_model_input"],"name":[1],"type":["lgl"],"align":["right"]},{"label":["model_output"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["lower"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["upper"],"name":[4],"type":["dbl"],"align":["right"]}],"data":[{"1":"NA","2":"9.024064","3":"8.587194","4":"9.460933"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+</div>
+<div id="section-b.-inference-on-a-single-proportion" class="section level3">
+<h3>b. Inference on a single proportion</h3>
+<p>Suppose we want to know the proportion of workers who belong to a union.</p>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["null_model_input"],"name":[1],"type":["lgl"],"align":["right"]},{"label":["model_output"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["lower"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["upper"],"name":[4],"type":["dbl"],"align":["right"]}],"data":[{"1":"NA","2":"0.1797753","3":"0.1471012","4":"0.2124493"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+</div>
+<div id="section-c.-inference-comparing-two-means" class="section level3">
+<h3>c. Inference comparing two means</h3>
+<p>Are the wages different for men and women?</p>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["sex"],"name":[1],"type":["fctr"],"align":["left"]},{"label":["model_output"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["lower"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["upper"],"name":[4],"type":["dbl"],"align":["right"]}],"data":[{"1":"M","2":"9.994913","3":"9.413178","4":"10.576649"},{"1":"F","2":"7.878857","3":"7.247040","4":"8.510674"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p>Do the intervals overlap?</p>
+</div>
+<div id="section-d.-inference-comparing-two-proportions" class="section level3">
+<h3>d. Inference comparing two proportions</h3>
+<p>Do a different proportion of men and women belong to unions?</p>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["sex"],"name":[1],"type":["fctr"],"align":["left"]},{"label":["model_output"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["lower"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["upper"],"name":[4],"type":["dbl"],"align":["right"]}],"data":[{"1":"M","2":"0.2352941","3":"0.19138920","4":"0.2791990"},{"1":"F","2":"0.1142857","3":"0.06660102","4":"0.1619704"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p>Do the intervals overlap?</p>
+</div>
+<div id="section-e.-inference-on-simple-regression" class="section level3">
+<h3>e. Inference on simple regression</h3>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["educ"],"name":[1],"type":["int"],"align":["right"]},{"label":["model_output"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["lower"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["upper"],"name":[4],"type":["dbl"],"align":["right"]}],"data":[{"1":"10","2":"6.758628","3":"6.141119","4":"7.376137"},{"1":"20","2":"14.263235","3":"13.110311","4":"15.416160"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p>Do the intervals overlap?</p>
+</div>
+<div id="section-f.-one-way-anova" class="section level3">
+<h3>f. One-way ANOVA</h3>
+<p>What we call one-way ANOVA is just standard ANOVA in the context of a categorical explanatory variable with multiple levels.</p>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["Df"],"name":[1],"type":["int"],"align":["right"]},{"label":["Sum Sq"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["Mean Sq"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["F value"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["Pr(>F)"],"name":[5],"type":["dbl"],"align":["right"]}],"data":[{"1":"7","2":"2571.572","3":"367.36747","4":"16.79558","5":"4.644607e-20","_rn_":"sector"},{"1":"526","2":"11505.126","3":"21.87286","4":"NA","5":"NA","_rn_":"Residuals"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+</div>
+<div id="section-g.-two-way-anova" class="section level3">
+<h3>g. Two-way ANOVA</h3>
+<p>What we call two-way ANOVA is standard ANOVA in a context where there are <strong>two</strong> categorical explanatory variables. We haven’t yet talked about multiple explanatory variables, so this is a little premature, but it’s not too much of a jump. We’re not concerned with whether the output depends on the variables individually, but whether one variable modulates the effect of another. This modulation is called an “interaction” in statistical terminology.</p>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["Df"],"name":[1],"type":["int"],"align":["right"]},{"label":["Sum Sq"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["Mean Sq"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["F value"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["Pr(>F)"],"name":[5],"type":["dbl"],"align":["right"]}],"data":[{"1":"7","2":"2571.5723","3":"367.36747","4":"17.501165","5":"7.213636e-21","_rn_":"sector"},{"1":"1","2":"435.9755","3":"435.97553","4":"20.769612","5":"6.465350e-06","_rn_":"sex"},{"1":"6","2":"174.8067","3":"29.13445","4":"1.387948","5":"2.173908e-01","_rn_":"sector:sex"},{"1":"519","2":"10894.3442","3":"20.99103","4":"NA","5":"NA","_rn_":"Residuals"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p>The p-value on the interaction line, <code>sector:sex</code>, tells us the result. If you’ve tried to teach two-way ANOVA, but don’t know what an interaction is see the tutorials on models with multiple explanatory variables.</p>
+</div>
+<div id="section-h.-inference-on-counts" class="section level3">
+<h3>h. Inference on counts</h3>
+<p>A chi-squared test examines whether two categorical variables are associated.</p>
+<p>There’s no simple regression equivalent of the chi-squared test. Recall that regression always has a <em>quantitative</em> response variable, and the two variables involved in chi-squared are quantitative.</p>
+<p>Often, at least one of the categorical variables has only two levels. Such categorical variables can be translated into quantitative variables with values 0 and 1, as we did in sections (b) and (d). In this setting, we do the moral equivalent of a chi-squared test by carrying out ANOVA on a model involving a two-level response and any other categorical variable.</p>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["Df"],"name":[1],"type":["int"],"align":["right"]},{"label":["Sum Sq"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["Mean Sq"],"name":[3],"type":["dbl"],"align":["right"]},{"label":["F value"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["Pr(>F)"],"name":[5],"type":["dbl"],"align":["right"]}],"data":[{"1":"7","2":"4.634871","3":"0.6621245","4":"4.699676","5":"3.957815e-05","_rn_":"sector"},{"1":"526","2":"74.106702","3":"0.1408873","4":"NA","5":"NA","_rn_":"Residuals"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p>The p-value is small, so we can reject the null that the probability of belonging to a union is independent of job <code>sector</code>. Even better, we can see how big the variation is:</p>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":["sector"],"name":[1],"type":["fctr"],"align":["left"]},{"label":["model_output"],"name":[2],"type":["dbl"],"align":["right"]}],"data":[{"1":"const","2":"0.35000000"},{"1":"sales","2":"0.02631579"},{"1":"clerical","2":"0.08247423"},{"1":"service","2":"0.20481928"},{"1":"manuf","2":"0.26470588"},{"1":"prof","2":"0.21904762"},{"1":"other","2":"0.27941176"},{"1":"manag","2":"0.05454545"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+</div>
+</div>
+<div id="section-space-to-experiment" class="section level2">
+<h2>Space to experiment</h2>
+<p>Experiment with regression using whatever data and variables that are of interest to you.</p>
+<div class="tutorial-exercise" data-label="playspace" data-caption="Space to play" data-completion="1" data-diagnostics="1" data-startover="1" data-lines="0">
+<script type="application/json" data-opts-chunk="1">{"fig.width":6.5,"fig.height":4,"fig.retina":2,"fig.align":"default","fig.keep":"high","fig.show":"asis","out.width":624,"warning":true,"error":false,"message":true,"exercise.df_print":"paged","exercise.checker":"NULL"}</script>
+</div>
+</div>
+<div id="section-covariates-and-multiple-explanatory-variables" class="section level2">
+<h2>Covariates and multiple explanatory variables</h2>
+<p>Recall Goal 6 from the GAISE report …</p>
+<blockquote>
+<ol start="6" style="list-style-type: decimal">
+<li>Students should gain experience with how statistical models, including <strong>multivariable models</strong>, are used.</li>
+</ol>
+</blockquote>
+<p>The reasons multivariate models are important, and why GAISE specifically mentions them, are:</p>
+<ol style="list-style-type: lower-alpha">
+<li>multivariable models are a way of studying complex systems. Which is simply to say that everyone knows that there are usually multiple factors involved in an outcome. So it’s natural to study those multiple factors.</li>
+<li>even in a traditional intro stats course, we talk about confounding, “lurking” variables, Simpson’s paradox, and such. Such situations always involve one or more variables that we may not be directly interested in but which we think are important in how a system works. Such variables are called “covariates.” Multivariable models are able to incorporate covariates.</li>
+</ol>
+<p>The ways to use multivariable models to deal with covariates require more space than can be taken in this tutorial. That also means that they will take more time in your course. All the more reason to streamline your course by using regression as a unifying theme.</p>
+<p>To give a quick illustration let’s return to the example of union membership differing by sector. As shown in setting (h) above, there’s clearly a connection between sector and union membership. But there are also connections between sector and sex. And age may be related to union membership. Let’s see if sector explains union membership when we take those covariates into account.</p>
+<div data-pagedtable="false">
+<script data-pagedtable-source type="application/json">
+{"columns":[{"label":[""],"name":["_rn_"],"type":[""],"align":["left"]},{"label":["Df"],"name":[1],"type":["int"],"align":["right"]},{"label":["Deviance"],"name":[2],"type":["dbl"],"align":["right"]},{"label":["Resid. Df"],"name":[3],"type":["int"],"align":["right"]},{"label":["Resid. Dev"],"name":[4],"type":["dbl"],"align":["right"]},{"label":["Pr(>Chi)"],"name":[5],"type":["dbl"],"align":["right"]}],"data":[{"1":"NA","2":"NA","3":"533","4":"503.0841","5":"NA","_rn_":"NULL"},{"1":"1","2":"7.418968","3":"532","4":"495.6652","5":"0.0064539809","_rn_":"age"},{"1":"1","2":"15.620695","3":"531","4":"480.0445","5":"0.0000774028","_rn_":"sex"},{"1":"7","2":"30.479948","3":"524","4":"449.5645","5":"0.0000775154","_rn_":"sector"}],"options":{"columns":{"min":{},"max":[10]},"rows":{"min":[10],"max":[10]},"pages":{}}}
+  </script>
+</div>
+<p><img src="Its_all_regression_files/figure-html/unnamed-chunk-10-1.png" width="624" /></p>
+<p>Age and sex seem to be related to union membership. And we see pretty clear differences between the management and sales sectors (low union membership) and manufactoring, construction, professional and service sectors.</p>
+<p>Oh, and point out that <code>lm()</code> is not the only way to construct a model, we decided to use logistic regression: that’s why the model-constructing function is <code>glm()</code> rather than <code>lm()</code>. Still, you can make pretty good sense of both the commands and the result. As a rule, logistic regression is more appropriate for regression on proportions when there are multiple explanatory variables or even a single quantitative explanatory variable.</p>
+
+<script type="application/shiny-prerendered" data-context="server-start">
+library(learnr)
+library(googlesheets)
+library(dplyr)
+library(ggformula)
+library(MASS)
+library(mosaicCore)
+library(mosaic)
+library(mosaicData)
+library(mosaicModel)
+knitr::opts_chunk$set(echo = FALSE)
+</script>
+ 
+<script type="application/shiny-prerendered" data-context="server">
+learnr:::register_http_handlers(session, metadata = NULL)
+</script>
+ 
+<script type="application/shiny-prerendered" data-context="server">
+`tutorial-exercise-two-models-result` <- learnr:::setup_exercise_handler(reactive(req(input$`tutorial-exercise-two-models-code-editor`)), session)
+output$`tutorial-exercise-two-models-output` <- renderUI({
+  `tutorial-exercise-two-models-result`()
+})
+</script>
+ 
+<script type="application/shiny-prerendered" data-context="server">
+`tutorial-exercise-bootstrap1-result` <- learnr:::setup_exercise_handler(reactive(req(input$`tutorial-exercise-bootstrap1-code-editor`)), session)
+output$`tutorial-exercise-bootstrap1-output` <- renderUI({
+  `tutorial-exercise-bootstrap1-result`()
+})
+</script>
+ 
+<script type="application/shiny-prerendered" data-context="server">
+`tutorial-exercise-intervals1-result` <- learnr:::setup_exercise_handler(reactive(req(input$`tutorial-exercise-intervals1-code-editor`)), session)
+output$`tutorial-exercise-intervals1-output` <- renderUI({
+  `tutorial-exercise-intervals1-result`()
+})
+</script>
+ 
+<script type="application/shiny-prerendered" data-context="server">
+`tutorial-exercise-standard-output-result` <- learnr:::setup_exercise_handler(reactive(req(input$`tutorial-exercise-standard-output-code-editor`)), session)
+output$`tutorial-exercise-standard-output-output` <- renderUI({
+  `tutorial-exercise-standard-output-result`()
+})
+</script>
+ 
+<script type="application/shiny-prerendered" data-context="server">
+`tutorial-exercise-playspace-result` <- learnr:::setup_exercise_handler(reactive(req(input$`tutorial-exercise-playspace-code-editor`)), session)
+output$`tutorial-exercise-playspace-output` <- renderUI({
+  `tutorial-exercise-playspace-result`()
+})
+</script>
+ <!--html_preserve-->
+<script type="application/shiny-prerendered" data-context="dependencies">
+{"type":"list","attributes":{},"value":[{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["jquery"]},{"type":"character","attributes":{},"value":["1.11.3"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/jquery-1.11.3"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["jquery.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["bootstrap"]},{"type":"character","attributes":{},"value":["3.3.5"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/bootstrap-3.3.5"]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["viewport"]}},"value":[{"type":"character","attributes":{},"value":["width=device-width, initial-scale=1"]}]},{"type":"character","attributes":{},"value":["js/bootstrap.min.js","shim/html5shiv.min.js","shim/respond.min.js"]},{"type":"character","attributes":{},"value":["css/cerulean.min.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["pagedtable"]},{"type":"character","attributes":{},"value":["1.1"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/pagedtable-1.1"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["js/pagedtable.js"]},{"type":"character","attributes":{},"value":["css/pagedtable.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["highlightjs"]},{"type":"character","attributes":{},"value":["9.12.0"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/highlightjs"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["highlight.js"]},{"type":"character","attributes":{},"value":["textmate.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial"]},{"type":"character","attributes":{},"value":["0.9.2"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial.js"]},{"type":"character","attributes":{},"value":["tutorial.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial-autocompletion"]},{"type":"character","attributes":{},"value":["0.9.2"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial-autocompletion.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial-diagnostics"]},{"type":"character","attributes":{},"value":["0.9.2"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial-diagnostics.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial-format"]},{"type":"character","attributes":{},"value":["0.9.2"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmarkdown/templates/tutorial/resources"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial-format.js"]},{"type":"character","attributes":{},"value":["tutorial-format.css","rstudio-theme.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["jquery"]},{"type":"character","attributes":{},"value":["1.11.3"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/jquery-1.11.3"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["jquery.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["font-awesome"]},{"type":"character","attributes":{},"value":["4.5.0"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["rmd/h/font-awesome-4.5.0"]}]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["css/font-awesome.min.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["rmarkdown"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["bootbox"]},{"type":"character","attributes":{},"value":["4.4.0"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/bootbox"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["bootbox.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["localforage"]},{"type":"character","attributes":{},"value":["1.5"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/localforage"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["localforage.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial"]},{"type":"character","attributes":{},"value":["0.9.2"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial.js"]},{"type":"character","attributes":{},"value":["tutorial.css"]},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial-autocompletion"]},{"type":"character","attributes":{},"value":["0.9.2"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial-autocompletion.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["tutorial-diagnostics"]},{"type":"character","attributes":{},"value":["0.9.2"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/tutorial"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["tutorial-diagnostics.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["ace"]},{"type":"character","attributes":{},"value":["1.2.6"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/ace"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["ace.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["clipboardjs"]},{"type":"character","attributes":{},"value":["1.5.15"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/clipboardjs"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["clipboard.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["ace"]},{"type":"character","attributes":{},"value":["1.2.6"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/ace"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["ace.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["clipboardjs"]},{"type":"character","attributes":{},"value":["1.5.15"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/clipboardjs"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["clipboard.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["ace"]},{"type":"character","attributes":{},"value":["1.2.6"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/ace"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["ace.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["clipboardjs"]},{"type":"character","attributes":{},"value":["1.5.15"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/clipboardjs"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["clipboard.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["ace"]},{"type":"character","attributes":{},"value":["1.2.6"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/ace"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["ace.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["clipboardjs"]},{"type":"character","attributes":{},"value":["1.5.15"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/clipboardjs"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["clipboard.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["ace"]},{"type":"character","attributes":{},"value":["1.2.6"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/ace"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["ace.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["name","version","src","meta","script","stylesheet","head","attachment","package","all_files"]},"class":{"type":"character","attributes":{},"value":["html_dependency"]}},"value":[{"type":"character","attributes":{},"value":["clipboardjs"]},{"type":"character","attributes":{},"value":["1.5.15"]},{"type":"list","attributes":{"names":{"type":"character","attributes":{},"value":["file"]}},"value":[{"type":"character","attributes":{},"value":["lib/clipboardjs"]}]},{"type":"NULL"},{"type":"character","attributes":{},"value":["clipboard.min.js"]},{"type":"NULL"},{"type":"NULL"},{"type":"NULL"},{"type":"character","attributes":{},"value":["learnr"]},{"type":"logical","attributes":{},"value":[true]}]}]}
+</script>
+<!--/html_preserve-->
+</div>
+
+</div> <!-- topics -->
+
+<div class="topicsContainer">
+<div class="topicsPositioner">
+<div class="band">
+<div class="bandContent topicsListContainer">
+
+<!-- begin doc-metadata -->
+<div id="doc-metadata">
+<h2 class="title toc-ignore" style="display:none;">Unifying inference with regression</h2>
+</div>
+<!-- end doc-metadata -->
+
+</div> <!-- bandContent.topicsListContainer -->
+</div> <!-- band -->
+</div> <!-- topicsPositioner -->
+</div> <!-- topicsContainer -->
+
+
+</div> <!-- bandContent page -->
+</div> <!-- pageContent band -->
+
+
+
+
+<script>
+// add bootstrap table styles to pandoc tables
+function bootstrapStylePandocTables() {
+  $('tr.header').parent('thead').parent('table').addClass('table table-condensed');
+}
+$(document).ready(function () {
+  bootstrapStylePandocTables();
+});
+</script>
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+
+</html>

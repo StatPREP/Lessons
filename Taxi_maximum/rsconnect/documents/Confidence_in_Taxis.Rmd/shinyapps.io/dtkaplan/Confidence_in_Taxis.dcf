@@ -1,0 +1,12 @@
+name: Confidence_in_Taxis
+title: Confidence_in_Taxis
+username:
+account: dtkaplan
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 207608
+bundleId: 1406884
+url: https://dtkaplan.shinyapps.io/Confidence_in_Taxis/
+when: 1527936551.80777
+asMultiple: FALSE
+asStatic: FALSE

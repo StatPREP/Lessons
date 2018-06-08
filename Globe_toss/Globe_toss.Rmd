@@ -1,0 +1,99 @@
+---
+title: "Using Google Spreadsheets"
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(googlesheets)
+library(dplyr)
+library(ggformula)
+library(mosaicCore)
+library(mosaic)
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+```{r read_data, message = FALSE}
+con2 <- gs_key("1ucevNh7wKLtOukyEpacUKi5_-KZUQGtIOONhWRnnnQ4")
+Globe <- gs_read(con2)
+```
+
+
+
+
+## The Globe Toss Activity
+
+In their book [*Teaching Statistics: A bag of tricks*](http://www.stat.columbia.edu/~gelman/bag-of-tricks/), Andrew Gelman and Deborah Nolan describe a nice classroom activity to get students thinking about the confidence interval on a proportion. Here's their description:
+
+> *We ask the class how they miught estimate the proportion of the earth covered by water. After several responses, we bring out an inflatable globe. If we were to take a random sample of points on the globe, then the proportion that touched water would be a reasonable estimate of the overall proportion of water covering the earth. Better yet, we can use a confidence interval to provide an interval estimate of the overall proportion. We explain that the globe will be tossed around the class, and we instruct students to hit the globe with the tip of their index finger when it comes to them. When they do, they are to shout "water!" if their finger touches water, or "land!" if their finger touches land. After the class starts to tire of volleyball, we can use the results to construct a confidence interval for the proportion.*
+
+```{r echo=FALSE, fig.align="center", out.width="30%", fig.cap="Catching the Atlantic Ocean."}
+knitr::include_graphics("images/globe-catch.jpg")
+```
+
+We're going to modify this activity a little bit:
+
+* Rather than saying "water!" or "land!", we're going to say which body of water is involved (if it's water) or which continent (if it's land).
+* We're going to enter the results from each toss in this [this spreadsheet](https://docs.google.com/spreadsheets/d/1ucevNh7wKLtOukyEpacUKi5_-KZUQGtIOONhWRnnnQ4/edit?usp=sharing)
+* Rather than simply computing a confidence interval on the sample proportion at the end of the activity, we're going to compute a running proportion that will show after each toss the proportion of water. By plotting out all that out, students will be able to see how the proportion converges. They might be able to extrapolate the pattern to see how many tosses would be needed to achieve a given precision. 
+
+To get started, the instructor should open the spreadsheet and display it to the class. Ask a student to open the spreadsheet as well; he or she will enter the data after each toss. (You'll need to have posted a link to the spreadsheet so that the student can get to it.) If you have a big class, use two or more globes and assign a student to each globe who will enter the data for that globe.
+
+At any point, you can display this tutorial to the students. It's here that you can do a statistical analysis, such as calculating the confidence interval on the proportion of tosses that resulted in water.
+
+Within R, you can access the data frame via the name `Globe`. The current version of the spreadsheet will always be used.
+
+```{r see_data, exercise = TRUE, message=FALSE, exercise.setup = "read_data"}
+Globe
+```
+
+
+
+
+## Cleaning the data
+
+It's often the case that data have some imperfections. For instance, people may have entered invalid levels for the `ocean` variable or the `name` variable.
+
+We want to look for any invalid names. For simplicity, we'll fix them in the spreadsheet itself. (In professional work there are other ways to do things both to avoid errors and to fix them without altering the original data.)
+
+```{r check_ocean, exercise = TRUE, message=FALSE, exercise.setup = "read_data"}
+Globe %>%
+  group_by(ocean) %>%
+  summarize(count = n()) %>%
+  arrange(desc(count))
+```
+
+
+```{r check_name, exercise = TRUE, message=FALSE, exercise.setup = "read_data"}
+Globe %>%
+  group_by(name) %>%
+  summarize(count = n()) %>%
+  arrange(desc(count))
+```
+
+## How much is ocean?
+
+```{r forcalculations, exercise = TRUE, message=FALSE, exercise.setup = "read_data", exercise.cap="Your stat calculations"}
+Globe <- 
+  Globe %>%
+  mutate(toss = row_number(), 
+         frac_ocean = cumsum(ocean == "yes") / toss)
+gf_line(frac_ocean ~ toss, data = Globe) %>%
+  gf_point()
+```
+
+## How big is Africa versus Asia?
+
+```{r forcalculations2, exercise = TRUE, message=FALSE, exercise.setup = "read_data", exercise.cap="More space for calculations"}
+Globe <- 
+  Globe %>%
+  filter(name %in% c("africa", "asia")) %>%
+  mutate(toss = row_number(), 
+         frac_africa = cumsum(name == "africa") / toss)
+gf_line(frac_africa ~ toss, data = Globe) %>%
+  gf_point()
+```
+
+
+

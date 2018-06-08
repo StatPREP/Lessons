@@ -1,0 +1,372 @@
+---
+title: "Polls and prediction"
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(mosaicCore)
+library(dplyr)
+library(ggformula)
+library(mosaic)
+knitr::opts_chunk$set(echo = FALSE)
+load("www/Votes_for_mayor.rda")
+```
+
+```{r prepare-votes}
+# winners <- c("BETSY HODGES", "MARK ANDREW", "DON SAMUELS")
+# Votes_for_mayor <-
+#   Votes_for_mayor %>%
+#   mutate(vote = ifelse(First %in% winners, First, "other")) %>%
+#   mutate(vote = ifelse(vote == "other",
+#                        ifelse(Second %in% winners, Second, "other"),
+#                        vote)) %>%
+#   mutate(vote = ifelse(vote == "other",
+#                        ifelse(Third %in% winners, Third, "other"),
+#                        vote)) %>%
+#   select(vote = vote, precinct = Precinct, ward = Ward)
+# # -----------------
+# V <- 
+#   Votes_for_mayor %>%
+#   mutate(vote = 
+#            ifelse(vote == "DON SAMUELS", "MARK ANDREW", vote))
+# # -----------------
+```
+
+```{r echo = FALSE}
+count_wins <- function(x, who = "BETSY HODGES") {
+  who_column <- which(grepl(who, names(x) ))
+  if (length(who_column) != 1) stop(paste("No column match for", who))
+  other_columns <- setdiff(1:ncol(x), who_column)
+  sofar = TRUE
+  x[is.na(x)] <- 0
+  for (col in other_columns) {
+    sofar <- sofar &  (x[[who_column]] > x[[col]])
+  }
+  counts( ~ result, data = data.frame(result = sofar))
+}
+# -----------------------
+vote_sim <- function(hodges_frac = 0.48, pop_size = 10000) {
+  vote = c("MARK ANDREW", "BETSY HODGES")[
+          1 + (seq(0, 1, length = pop_size) <= hodges_frac)]
+  data.frame(stringsAsFactors = FALSE,
+             vote = sample(vote))
+}
+```
+
+```{r ref.label="prepare-votes"}
+# get the above chunk into the space where this document is knitted
+```
+
+
+```{r eval=FALSE}
+# Create a data file with the simplified votes
+# This is saved in www/ and thereafter, we don't need the DataComputing package
+data("Minneapolis2013", package = "DataComputing")
+winners <- c("BETSY HODGES", "MARK ANDREW", "DON SAMUELS")
+Votes_for_mayor <-
+  Minneapolis2013 %>%
+    mutate(vote = ifelse(First %in% winners, First, "other")) %>%
+  mutate(vote = ifelse(vote == "other",
+                       ifelse(Second %in% winners, Second, "other"),
+                       vote)) %>%
+  mutate(vote = ifelse(vote == "other",
+                       ifelse(Third %in% winners, Third, "other"),
+                       vote)) %>%
+  filter(vote %in% winners) %>%
+  mutate(vote = gsub("^[A-Z]* ", "", vote)) %>%
+  select(vote = vote, precinct = Precinct, ward = Ward)
+save(Votes_for_mayor, file = "www/Votes_for_mayor.rda")
+```
+
+## What are polls for?
+
+Voting day in the US is preceeded by months or years of political opinion surveys or "polls." Many people interpret the results of the polls as a prediction of how the election will turn out. This view is very common, but of course it is the votes themselves that determine the election and there are many reasons why the opinion surveys may not match the election results.
+
+* Voters may change their minds. 
+* The people surveyed may not reveal their true preferences. 
+* People who agree to answer the survey may be different in their political views than people who refuse to answer. Indeed, the people who the survey-takers can reach may have, on average, different political views than those who cannot be reached.
+* Registered voters included in the survey do not necessarily vote in the election.
+* The results from the opinion surveys may themselves change how people act.
+
+These are all valid reasons to question the predictive power of polls. But even with all these valid reasons, a common rejection of opinion polls is founded in fallacy:
+
+* FALLACY. If the size of the voting population is much bigger than the size of the opinion poll, then the opinion poll can't be used for prediction. After all, typical opinion polls have one- to two-thousand participants, which might be 1% or less of the number of voters (for a state election) or 0.001% for a presidential election. 
+
+## Sampling voters
+
+Since elections involve a secret ballot, it can be hard to get ballot-by-ballot data. One place where a complete list of ballots was published is the mayoral election in Minneapolis, Minnesota in 2013. 
+
+Here's the final vote tally out of `nrow(Votes_for_mayor)` altogether:
+
+```{r echo = TRUE}
+counts( ~ vote, data = Votes_for_mayor)
+```
+
+Betsy Hodges won. She got more votes than any other candidate.
+
+Suppose we had conducted an opinion poll before the election. The idea kind of prediction poll would be able to ask the eventual voters for their preferences. This is impossible to do in practice. After all, who turns out to vote depends on many things including random factors such as the weather, transportation, and so on. And it's unlikely that everybody we survey will give an answer, let alone an honest answer. Still, let's assume that we actually could collect an honest, random sample of the eventual voters.
+
+The `sample_n()` function takes a random sample from a data table. Since `Votes_for_mayor` contains all the votes, doing a pre-election survey is equivalent to taking a random sample from the votes. Let's take a survey of 0.025% of the eventual voters: 20 participants altogether.
+
+```{r}
+set.seed(101)
+```
+
+```{r echo = TRUE}
+counts( ~ vote, data = sample_n(Votes_for_mayor, size = 20))
+```
+
+Betsy Hodges was the leading candidate in the poll. In other words, this particular poll correctly indicates the eventual winner.
+
+## An Ensemble of Polls
+
+In the previous section we simulated one opinion survey about the Minneapolis mayoral election. That one came out the same as the eventual vote, even though there were 1000 times as many voters as people in the random sample for the survey.
+
+Will Betsy Hodges be the winner in all such surveys? Let's try a few more:
+
+```{r echo = TRUE}
+counts( ~ vote, data = sample_n(Votes_for_mayor, size = 20))
+counts( ~ vote, data = sample_n(Votes_for_mayor, size = 20))
+counts( ~ vote, data = sample_n(Votes_for_mayor, size = 20))
+counts( ~ vote, data = sample_n(Votes_for_mayor, size = 20))
+counts( ~ vote, data = sample_n(Votes_for_mayor, size = 20))
+```
+
+This tiny survey, $n=20$, gets it right most of the time. Here's a way to repeat the random selection 100 times, that is, to "conduct 100 trials" of the simulation.
+
+```{r echo = TRUE, warning = FALSE}
+Trials <- Do(100) * 
+  counts( ~ vote, 
+          data = sample_n(Votes_for_mayor, size = 20))
+Trials
+```
+
+
+You can page through the 100 simulations to see how often the survey pointed to the eventual winner. The `count_wins()` function was specially written to make the job easier: 
+
+
+```{r echo = TRUE}
+Trials %>% 
+  df_stats(~ n_HODGES > n_ANDREW, mean) 
+```
+
+This tiny survey is making the right call about two-thirds of the time.
+
+How big would the survey have to be to show Betsy Hodges in the lead 95% of the time. The following code block will repeat the simulation; you can set the size of the poll. Try a few survey sizes and find the smallest that gives Hodges as a winner about 95% of the time.
+
+```{r orig_split, exercise = TRUE, exercise.setup = "prepare-votes", warning = FALSE}
+Trials <- Do(500) * 
+  counts( ~ vote, 
+          data = sample_n(Votes_for_mayor, size = 50))
+Trials %>%
+  df_stats( ~ n_HODGES > n_ANDREW, mean)
+```
+
+```{r orig_split_2}
+question("What's the smallest survey size that leads to the correct prediction about 95% of the time?",
+         answer("About $n = 30$.", correct = FALSE),
+         answer("About $n = 50$.", correct = FALSE),
+         answer("About $n = 100$.", correct = TRUE),
+         answer("About $n = 250$.", correct = FALSE, message = "That does better than 95%."), allow_retry = TRUE)
+```
+
+## Survey after the vote?
+
+The logic in the previous section is inside-out. Knowing the result of the election, we could figure out how big a survey $n$ is needed to make a correct prediction 95% of the time. But obviously we don't know the results at the time the survey would be made. How can we figure out how big a survey ought to be *before* we have the results?
+
+The answer might depend on how close the election is. To investigate this, let's make a new data set where the election is quite close by turning the votes for Don Samuels into votes for Mark Andrew.
+
+```{r echo = TRUE}
+V <- Votes_for_mayor %>%
+  mutate(vote = ifelse(vote == "SAMUELS", "ANDREW", vote))
+counts( ~ vote, data = V)
+```
+
+This is enough to make the election very close. Mark Andrew comes out a little ahead.
+
+We'll do the simulation for opinion surveys on this new data set. Will the simulated survey show Mark Andrew as the winner? Try bigger and bigger sample sizes (the `size = ` below) until you find a size $n$ that has Mark Andrew winning, say, in 95% of the trials. You don't need to go above $n = $10,000.
+```{r try-even, exercise = TRUE, exercise.setup = "prepare-votes"}
+Trials <- Do(100) * 
+  counts( ~ vote, 
+          data = sample_n(V, size = 100))
+count_wins(Trials, "n_ANDREW")
+```
+
+<div id="try-even-hint">The nature of surveys is that they are much smaller than the population from which the survey is taken. There are 80,000 votes in the data, so the maximum survey size we've asked you to check is $n = 10,000$. Even at that big size, do the surveys reliably predict the actual outcome?</div>
+
+We can't get a reliable prediction at any size!
+
+Let's summarise what we've found. In the surveys drawn from the actual data, where Betsy Hodges won by a large margin, we needed only a very small survey sample size to get reliable predictions. But in the second set of data, where Mark Andrew wins by only a small margin, we can't get reliable predictions for any survey size.
+
+## How precise a result?
+
+In the actual election, Betsy Hodges earned a substantially bigger proportion of the vote than any of the other candidates:
+
+```{r echo = TRUE}
+props( ~ vote, data = Votes_for_mayor)
+```
+
+Betsy Hodges' proportion is about 14 percentage points higher than the runner-up, Mark Andrew. Roughly speaking, if the survey sample is large enough to be precise to about 10 percentage points, the survey will reliably indicate Hodges as the winner.
+
+In the simulated election where the election was much closer, Mark Andrew wins by only a small proportion, 0.3 percentage points.
+
+```{r echo = TRUE}
+props( ~ vote, data = V)
+```
+
+In order for a survey sample to be able reliably to pick Mark Andrews as the winner, the survey result would need to be precise to about 0.15 percentage points. So the close election would require much more precision from the survey sample than does the election with a wide point spread.
+
+## Precision of polls
+
+The people running an voter opinion survey need to determine how many people to sample from the population. Obviously, they can't wait until after the election to carry out the sorts of simulations we did in the preceeding sections. They have to work with the information they already have at hand *before* the election and, indeed, before the poll results are available. 
+
+In actual practice, the available information can be very little or none. Instead, it's typical for pollsters to decide what precision, or "margin of error," they are willing to accept. For instance, professional polling organizations often aim for a margin of error of $\mbox{E} \approx 0.03$, that is, 3 percentage points. 
+
+In order to achieve a specified margin of error $E$, the size of the poll $n$ ought to be no smaller than:
+
+$$n \approx \frac{1}{E^2}$$
+Or, looking at the same relationship in another way, given a poll with $n$ participants, the margin of error will be
+
+$$E \approx \sqrt{\frac{1}{n}}$$
+
+### Exercise
+
+Here is a command box where you can run the commands for the calculations needed in the equations
+
+```{r margin-calc, exercise = TRUE}
+# Find margin of error, given n
+n <- 1000
+sqrt(1 / N)
+
+# Find n for a given margin of error
+E <- 0.03 # each percentage point is 0.01
+1 / E^2
+```
+
+```{r margins}
+quiz(caption = "Poll sample size and precision",
+  question("In the Minneapolis election, a poll with a margin of error of about 10 percentage points would have been able to predict the result of the election. What's the corresponding sample size $n$?",
+    answer("10", correct = FALSE),
+    answer("100", correct = TRUE),
+    answer("1000", correct = FALSE),
+    answer("10,000", correct = FALSE),
+    answer("$>$ 100,000", correct = FALSE)
+  ),
+  question("In the simulated close election, a poll would need a precision of 0.15 percentage points to be able reliably to predict the outcome of the election. What's the corresponding sample size $n$?",
+    answer("10", correct = FALSE),
+    answer("100", correct = FALSE),
+    answer("1000", correct = FALSE),
+    answer("10,000", correct = FALSE),
+    answer("$>$ 100,000", correct = TRUE, message = "Right. ")
+  )
+)
+```
+
+## Confirming the precision formula
+
+How can you check that the formula for the margin of error, $E = \sqrt{1/N}$, is correct? Here's one way:
+
+Suppose you create a population of some large size $N$ where fraction $p$ of the population votes for Betsy Hodges. From that population, you can take simulated samples of size $n$, for any $n$ you choose. Each of those samples will give an estimate of $p$. You can look at the 95% coverage interval across all of the simulation trials. The margin of error will be half the width of the coverage interval. 
+
+```{r vote_sim_2, exercise = TRUE, exercise.setup = "prepare-votes"}
+N <- 10000
+p <- 0.48 # between zero and one
+Sim_votes <- vote_sim(hodges_frac = p, pop_size = N)
+props( ~ vote, data = Sim_votes)
+
+# Simulated samples of size n
+n <- 50
+Trials <- Do(100) * 
+  props( ~ vote, 
+           data = sample_n(Sim_votes, size = n))
+gf_density( ~ `prop_BETSY.HODGES`, data = Trials)
+df_stats( ~ `prop_BETSY.HODGES`, data = Trials, coverage)
+```
+
+### Exercise
+
+Run the code block above multiple times as indicated in each of the questions. You may want to write down the coverage intervals produced by the statements. Keep in mind that the margin of error is one-half the width of the coverage interval.  Remember to pay attention to whether you're being asked to change little $n$, the size of the sample, or big $N$, the size of the population.
+
+
+
+```{r prop-ci}
+quiz(caption = "Little n and big N",
+  question("Using the code block above and holding big N at 100,000, try poll sample sizes of little n $=$ 50, 200, 800, 3200. What happens to the margin of error as n increases?",
+    answer("The margin of error is bigger when n is bigger." , correct = FALSE),
+    answer("The margin of error is smaller when n is bigger.", correct = TRUE),
+    answer("There is no relationship between the size of the margin of error and the sample size n.", correct = FALSE)
+  ),
+  question("Using the code block above and holding little n at 1000, try population sizes N of 5000, 20,000, 80,000, and 320,000. What happens to the margin of error as N increases?",
+    answer("The margin of error is bigger when N is bigger." , correct = FALSE),
+    answer("The margin of error is smaller when N is bigger.", correct = FALSE),
+    answer("The margin of error is pretty much the same regardless of the population size N.", correct = TRUE)
+  )
+)
+```
+
+Recall the formula given above:
+
+$$E \approx \sqrt{\frac{1}{n}}$$
+
+This formula suggests that if the sample size $n$ were increased by a factor of 4, the margin of error will shrink by a factor of $\sqrt{4} = 2$. Check whether this seems to be the case in your experiments with the code chunk.
+
+## Why $\pm 3$%? 
+
+Why do pollsters so often set their target margin of error at 3 percentage points? The target doesn't need to be this; you should set it to whatever is appropriate for the problem you are dealing with.  
+
+Pollsters often have in mind the idea of a "landslide" election. If the poll indicates a landslide, the pollsters want to be absolutely sure that the election is not going to turn out the other way.  A common definition of a landslide win is getting more than 60% of the vote. On the other hand, a pretty close vote might involving winning with 52% of the vote. The pollsters want to make sure that if they get a landslide result in their poll, the margin of error doesn't come anywhere near what it would for a close vote. By targeting a 3 percentage point margin of error, a close-vote result is almost certain to be within the interval $52 \pm 3$%, which is less than 55%. 
+
+On the other hand, in a landslide situation, the pollsters don't want to get a result that is anything like a close-vote result. Remember, at a margin of error of 3 percentage points, the close-vote poll result is almost surely below 55%. And the landslide poll result is almost surely above 57%. Thus, a 3 percentage point margin of error keeps the possible poll results for a close-vote and a landslide-vote situation completely separate. If the target margin of error were 5 percentage points, a close-vote situation and a landslide vote situation might result in exactly the same poll results!
+
+## Precision of "trends"
+
+Many people look at successive polls to see if there is a "trend" from one poll to the next, for instance whether the candidates popularity is falling. It's easy enough to quantify the trend: subtract the earlier poll result from the later poll's result.
+
+It's important, though, to know what is the margin of error in that difference. It is *not* simply the margin of error of each poll, nor even the sum of the two polls' margin of error. Instead, it is in-between.
+
+The following code block simulates a situation where there is a slight upward trend for Betsy Hodges of 3 percentage points. A *before* and *after* poll is conducted, and we want to look at the difference from before to after.
+
+```{r trends, exercise = TRUE, exercise.setup = "prepare-votes"}
+# Simulation for the whole population
+N <- 10000
+Before <- vote_sim(hodges_frac = 0.48, pop_size = N) %>%
+  mutate(when = "before")
+After <- vote_sim(hodges_frac = 0.51, pop_size = N) %>%
+  mutate(when = "after")
+All_the_data <- rbind(Before, After)
+# Look at the whole population
+props( ~ vote | when, data = All_the_data) %>%
+  tidyr::spread(key = when, value = `prop_BETSY HODGES`) %>%
+  mutate(change = after - before) 
+
+# Look at samples of size n
+n <- 8000
+Trials <- Do(100) * {
+  props( vote ~ when, 
+       data = sample_n(All_the_data, size = n), 
+       tidy = TRUE) %>%
+  tidyr::spread(key = proportion, value = Freq) %>%
+  mutate(change = after - before) 
+}
+# Calculate the coverage intervals of the trials
+qstats(change ~ vote, data = Trials, coverage)
+```
+
+Run the code block to see the confidence interval for before-and-after polls of size n $=$ 1000 each. As before, we're calculating the by running many simulated polls and taking the 95% coverage interval on the results.
+
+### Exercise
+
+If the confidence interval on the difference between the polls includes zero, there's little evidence that there is a trend. Using the code block above, run the simulation for n $=$ 1000, 2000, 4000, and 8000.
+
+We set up the simulation so that the trend was from 48% to 51%, which is a 3 percentage point upward trend.
+
+```{r trends2}
+question("What sample size n is required so that you can safely conclude there is an upward trend of at least 1 percentage point?",
+         answer("n = 1000", correct = FALSE),
+         answer("n = 2000", correct = FALSE),
+         answer("n = 4000", correct = FALSE),
+         answer("n = 8000", correct = TRUE)
+         )
+```
