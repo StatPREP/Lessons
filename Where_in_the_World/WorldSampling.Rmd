@@ -1,0 +1,109 @@
+---
+title: "Sampling Points on Earth"
+output: html_document
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(leaflet)
+library(mosaic)
+```
+
+
+Select a number of points and then click the button to generate a map with random
+points identified.
+
+```{r eruptions, echo=FALSE}
+
+rv <- reactiveValues(total_points = 0, last_go = 0)
+
+column(
+  6,
+  textInput("name", "ID", placeholder = "enter your name or other identifier", 
+            width = "100%"),
+  selectInput("n_points", label = "Number of points:",
+              choices = c(1, 5, 10, 20), selected = 10),
+  actionButton("go", label = "Generate points on map")
+  )
+column(
+  6,
+  h4("Restrict sampling region"),
+  sliderInput("lat_range", "latitude", min = -90, max = 90, 
+              step = 1, value = c(-90, 90)),
+  sliderInput("lon_range", "longitude", min = -180, max = 180, 
+              step = 1, value = c(-180, 180))
+  )
+  p("")
+  
+tabsetPanel(
+  tabPanel(
+    "Map",
+    p(),
+    p("Circles have radii 1, 5, and 10 miles."),
+    renderLeaflet({
+      if (input$go > 0) {
+        leaflet::leaflet(data = points()) %>% 
+          leaflet::addTiles() %>% 
+          leaflet::addAwesomeMarkers(
+            lat = ~lat, lng = ~lon, label = labels()) %>%
+          leaflet::addCircles(lat = ~lat, lng = ~lon, radius = 1609) %>% 
+          leaflet::addCircles(lat = ~lat, lng = ~lon, radius = 5 * 1609, 
+                              color = "red") %>% 
+          leaflet::addCircles(lat = ~lat, lng = ~lon, radius = 10 * 1609, 
+                              color = "green", opacity = 0.2) 
+        # %>% 
+        #   leaflet::setView(0, 0, zoom = 1)
+      }
+    })
+  ),
+  tabPanel(
+    "Data",
+    p({"These data can be copied to save a record of the points
+  investigated."}),
+  
+  renderDataTable({
+    if (input$go > 0) {
+      points() 
+    }
+  })
+  )
+)
+
+observeEvent(
+  input$go, 
+  { 
+    new_value <- rv$total_points + as.integer(input$n_points)
+    rv$total_points <- new_value
+  })
+
+points <- eventReactive(rv$total_points, {
+  mosaic::rgeo(input$n_points, 
+               latlim = input$lat_range,
+               lonlim = input$lon_range
+               ) %>%
+    dplyr::arrange(lon, lat) %>% 
+    dplyr::mutate(
+      name = input$name,
+      point = 
+        (rv$total_points - as.integer(input$n_points) + 1) :
+        rv$total_points,
+      lat = round(lat, 3),
+      lon = round(lon, 3)
+    ) %>% 
+    dplyr::select(name, point, lat, lon)
+}, ignoreNULL = FALSE)
+
+
+labels <- eventReactive(input$go, {
+  as.character(
+    (rv$total_points - as.integer(input$n_points) + 1) : rv$total_points
+  )
+}, ignoreNULL = FALSE)
+
+
+
+
+```
+
+
